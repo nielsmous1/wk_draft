@@ -1,0 +1,2884 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WK 2026 Draft Challenge</title>
+<script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800;900&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0A1128;
+  --bg2: #0F1A3D;
+  --panel: #131F47;
+  --panel2: #1A2856;
+  --line: #263568;
+  --grass: #00D46A;
+  --grass-dim: #00A653;
+  --gold: #FFB627;
+  --red: #FF3B5C;
+  --white: #F5F8FF;
+  --text: #C3CDE8;
+  --muted: #7A87AD;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; -webkit-font-smoothing: antialiased; }
+body { min-height: 100vh; overflow-x: hidden; }
+#root { min-height: 100vh; }
+.cond { font-family: 'Barlow Condensed', sans-serif; }
+.mono { font-family: 'JetBrains Mono', monospace; }
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--line); border-radius: 5px; }
+::-webkit-scrollbar-thumb:hover { background: var(--panel2); }
+
+@keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes popIn { 0% { opacity: 0; transform: scale(0.9); } 60% { transform: scale(1.02); } 100% { opacity: 1; transform: scale(1); } }
+@keyframes slideInLeft { from { opacity: 0; transform: translateX(-20px); } to { opacity: 1; transform: translateX(0); } }
+@keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
+@keyframes goalFlash { 0% { background: var(--grass); } 100% { background: transparent; } }
+@keyframes trophySpin { 0% { transform: rotateY(0deg) scale(0.5); opacity: 0; } 100% { transform: rotateY(360deg) scale(1); opacity: 1; } }
+@keyframes confetti { 0% { transform: translateY(-10vh) rotate(0deg); opacity: 1; } 100% { transform: translateY(110vh) rotate(720deg); opacity: 0; } }
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<!-- Jouw scorebord-instellingen. Ontbreekt dit bestand? Dan draait het scorebord lokaal. -->
+<script src="config.js"></script>
+<script type="text/babel">
+const { useState, useEffect, useRef, useMemo } = React;
+
+// ═══════════════════════════════════════════════════════════════════
+// DATA
+// ═══════════════════════════════════════════════════════════════════
+const FLAGS = {
+  "Mexico":"🇲🇽","South Korea":"🇰🇷","South Africa":"🇿🇦","Czech Republic":"🇨🇿",
+  "Canada":"🇨🇦","Switzerland":"🇨🇭","Qatar":"🇶🇦","Bosnia":"🇧🇦",
+  "Brazil":"🇧🇷","Morocco":"🇲🇦","Haiti":"🇭🇹","Scotland":"🏴󠁧󠁢󠁳󠁣󠁴󠁿",
+  "USA":"🇺🇸","Paraguay":"🇵🇾","Australia":"🇦🇺","Turkey":"🇹🇷",
+  "Germany":"🇩🇪","Ecuador":"🇪🇨","Ivory Coast":"🇨🇮","Curacao":"🇨🇼",
+  "Netherlands":"🇳🇱","Japan":"🇯🇵","Tunisia":"🇹🇳","Sweden":"🇸🇪",
+  "Belgium":"🇧🇪","Egypt":"🇪🇬","Iran":"🇮🇷","New Zealand":"🇳🇿",
+  "Spain":"🇪🇸","Uruguay":"🇺🇾","Saudi Arabia":"🇸🇦","Cape Verde":"🇨🇻",
+  "France":"🇫🇷","Senegal":"🇸🇳","Norway":"🇳🇴","Iraq":"🇮🇶",
+  "Argentina":"🇦🇷","Austria":"🇦🇹","Algeria":"🇩🇿","Jordan":"🇯🇴",
+  "Colombia":"🇨🇴","Portugal":"🇵🇹","DR Congo":"🇨🇩","Uzbekistan":"🇺🇿",
+  "England":"🏴󠁧󠁢󠁥󠁮󠁧󠁿","Croatia":"🇭🇷","Ghana":"🇬🇭","Panama":"🇵🇦",
+};
+function flagOf(team) { return FLAGS[team] || "🏳️"; }
+
+const SQUADS = {
+  'Mexico': {
+    formation: '4-3-3',
+    players: [
+      ['Raul Rangel', ['GK'], 79],
+      ['Jorge Sanchez', ['RB'], 76],
+      ['Cesar Montes', ['CB'], 79],
+      ['Johan Vasquez', ['CB'], 81],
+      ['Jesus Gallardo', ['LB'], 77],
+      ['Edson Alvarez', ['CDM','CM'], 82],
+      ['Erik Lira', ['CM','CDM'], 76],
+      ['Gilberto Mora', ['CM','CAM'], 81],
+      ['Roberto Alvarado', ['RW','LW'], 78],
+      ['Raul Jimenez', ['ST'], 84],
+      ['Julian Quinones', ['LW','ST','RW'], 87],
+    ],
+  },
+  'South Korea': {
+    formation: '4-2-3-1',
+    players: [
+      ['Kim Seung-Gyu', ['GK'], 78],
+      ['Lee Han-Beom', ['RB'], 74],
+      ['Kim Min-Jae', ['CB'], 86],
+      ['Lee Gi-Hyuk', ['CB'], 74],
+      ['Seol Young-Woo', ['LB','RB'], 75],
+      ['Hwang In-Beom', ['CDM','CM'], 81],
+      ['Paik Seung-Ho', ['CM','CDM'], 77],
+      ['Lee Kang-In', ['CAM','RW','LW'], 84],
+      ['Hwang Hee-Chan', ['RW','ST'], 80],
+      ['Lee Jae-Sung', ['CAM','CM'], 79],
+      ['Son Heung-Min', ['LW','ST','CAM'], 83],
+    ],
+  },
+  'South Africa': {
+    formation: '4-2-3-1',
+    players: [
+      ['Ronwen Williams', ['GK'], 81],
+      ['Khuliso Mudau', ['RB'], 75],
+      ['Ime Okon', ['CB'], 74],
+      ['Mbekezeli Mbokazi', ['CB'], 80],
+      ['Aubrey Modiba', ['LB'], 75],
+      ['Teboho Mokoena', ['CDM','CM'], 79],
+      ['Sphephelo Sithole', ['CDM','CM'], 74],
+      ['Thapelo Maseko', ['RW','RM'], 79],
+      ['Relebohile Mofokeng', ['CAM','LW'], 79],
+      ['Oswin Appollis', ['LW','RW'], 76],
+      ['Evidence Makgopa', ['ST'], 74],
+    ],
+  },
+  'Czech Republic': {
+    formation: '4-2-3-1',
+    players: [
+      ['Matej Kovar', ['GK'], 78],
+      ['Vladimir Coufal', ['RB'], 77],
+      ['Ladislav Krejci', ['CB'], 83],
+      ['Tomas Holes', ['CB','CDM'], 76],
+      ['David Doudera', ['LB'], 74],
+      ['Tomas Soucek', ['CDM','CM'], 81],
+      ['Michal Sadilek', ['CM','CDM'], 77],
+      ['Pavel Sulc', ['CAM','RW'], 79],
+      ['Adam Hlozek', ['RW','ST'], 80],
+      ['Patrik Schick', ['ST'], 83],
+      ['Antonin Barak', ['CM','CAM'], 78],
+    ],
+  },
+  'Switzerland': {
+    formation: '4-2-3-1',
+    players: [
+      ['Gregor Kobel', ['GK'], 85],
+      ['Luca Jaquez', ['RB','CB'], 76],
+      ['Nico Elvedi', ['CB'], 81],
+      ['Manuel Akanji', ['CB'], 85],
+      ['Ricardo Rodriguez', ['LB'], 79],
+      ['Remo Freuler', ['CDM','CM'], 81],
+      ['Granit Xhaka', ['CDM','CM'], 83],
+      ['Johan Manzambi', ['LW','CAM','RW','ST'], 84],
+      ['Djibril Sow', ['CM','CDM'], 79],
+      ['Ruben Vargas', ['LW','RW'], 82],
+      ['Breel Embolo', ['ST'], 82],
+    ],
+  },
+  'Canada': {
+    formation: '4-3-3',
+    players: [
+      ['Maxime Crepeau', ['GK'], 77],
+      ['Alistair Johnston', ['RB'], 79],
+      ['Moise Bombito', ['CB'], 79],
+      ['Derek Cornelius', ['CB'], 76],
+      ['Alphonso Davies', ['LB','LW'], 86],
+      ['Stephen Eustaquio', ['CM','CDM'], 80],
+      ['Nathan-Dylan Saliba', ['CM','CDM'], 77],
+      ['Tajon Buchanan', ['RW','LW'], 78],
+      ['Jonathan David', ['ST','LW'], 85],
+      ['Cyle Larin', ['ST'], 80],
+      ['Liam Millar', ['LW','LM'], 75],
+    ],
+  },
+  'Qatar': {
+    formation: '4-3-3',
+    players: [
+      ['Mahmoud Abunada', ['GK'], 72],
+      ['Pedro Miguel', ['RB','CB'], 73],
+      ['Boualem Khoukhi', ['CB'], 74],
+      ['Issa Laaye', ['CB'], 71],
+      ['Sultan Al-Brake', ['LB'], 72],
+      ['Karim Boudiaf', ['CDM','CM'], 74],
+      ['Ahmed Fathi', ['CM','CDM'], 71],
+      ['Jassem Jaber', ['CM','CAM'], 72],
+      ['Akram Afif', ['RW','LW','CAM'], 79],
+      ['Almoez Ali', ['ST'], 76],
+      ['Edmilson Junior', ['LW','CAM'], 75],
+    ],
+  },
+  'Bosnia': {
+    formation: '4-4-2',
+    players: [
+      ['Nikola Vasilj', ['GK'], 77],
+      ['Amar Dedic', ['RB'], 81],
+      ['Nikola Katic', ['CB'], 76],
+      ['Adnan Malic', ['CB'], 73],
+      ['Sead Kolasinac', ['LB'], 79],
+      ['Kerim Alajbegovic', ['LM','CAM','LW'], 83],
+      ['Ivan Basic', ['CM','CDM'], 75],
+      ['Benjamin Tahirovic', ['CM','CDM'], 77],
+      ['Dzenis Bajraktarevic', ['RM','RW'], 75],
+      ['Ermedin Demirovic', ['ST','LW'], 80],
+      ['Edin Dzeko', ['ST'], 81],
+    ],
+  },
+  'Brazil': {
+    formation: '4-3-3',
+    players: [
+      ['Alisson', ['GK'], 89],
+      ['Danilo', ['RB','CB'], 80],
+      ['Marquinhos', ['CB'], 90],
+      ['Gabriel Magalhaes', ['CB'], 90],
+      ['Alex Sandro', ['LB'], 78],
+      ['Casemiro', ['CDM','CM'], 84],
+      ['Bruno Guimaraes', ['CM','CDM'], 88],
+      ['Lucas Paqueta', ['CM','CAM'], 84],
+      ['Raphinha', ['RW','LW','CAM'], 90],
+      ['Matheus Cunha', ['ST','CAM','LW'], 84],
+      ['Vinicius Junior', ['LW','RW','ST'], 93],
+    ],
+  },
+  'Morocco': {
+    formation: '4-2-3-1',
+    players: [
+      ['Yassine Bounou', ['GK'], 87],
+      ['Achraf Hakimi', ['RB','RWB'], 90],
+      ['Issa Diop', ['CB'], 83],
+      ['Chadi Riad', ['CB'], 81],
+      ['Noussair Mazraoui', ['LB','RB','CB'], 85],
+      ['Neil El Aynaoui', ['CDM','CM'], 82],
+      ['Ayyoub Bouaddi', ['CDM','CM'], 84],
+      ['Brahim Diaz', ['RW','CAM','LW'], 85],
+      ['Azzedine Ounahi', ['CAM','CM'], 84],
+      ['Bilal El Khannouss', ['LW','CAM'], 84],
+      ['Ismael Saibari', ['ST','CAM','CM'], 86],
+    ],
+  },
+  'Haiti': {
+    formation: '4-3-3',
+    players: [
+      ['Johny Placide', ['GK'], 71],
+      ['Ricardo Ade', ['RB','CB'], 71],
+      ['Hannes Delcroix', ['CB'], 75],
+      ['Garven Metusala', ['CB'], 71],
+      ['Jean-Kevin Duverne', ['LB','CB'], 73],
+      ['Danley Jean Jacques', ['CDM','CM'], 73],
+      ['Carl Sanon', ['CM'], 70],
+      ['Leverton Pierre', ['CM','CAM'], 70],
+      ['Ruben Providence', ['RW','LW'], 74],
+      ['Frantzdy Pierrot', ['ST'], 75],
+      ['Wilson Isidor', ['ST','LW'], 77],
+    ],
+  },
+  'Scotland': {
+    formation: '4-3-3',
+    players: [
+      ['Angus Gunn', ['GK'], 78],
+      ['Nathan Patterson', ['RB','RWB'], 77],
+      ['Grant Hanley', ['CB'], 77],
+      ['Jack Hendry', ['CB'], 78],
+      ['Andy Robertson', ['LB','LWB'], 84],
+      ['Scott McTominay', ['CM','CAM'], 85],
+      ['Lewis Ferguson', ['CM','CDM'], 80],
+      ['Ryan Christie', ['CM','CAM','RW'], 79],
+      ['Ben Gannon-Doak', ['RW','LW'], 78],
+      ['John McGinn', ['LW','CM','CAM'], 82],
+      ['Lawrence Shankland', ['ST'], 77],
+    ],
+  },
+  'USA': {
+    formation: '4-2-3-1',
+    players: [
+      ['Matt Freese', ['GK'], 78],
+      ['Alex Freeman', ['RB'], 78],
+      ['Chris Richards', ['CB'], 82],
+      ['John Stones', ['CB','CDM'], 82],
+      ['Antonee Robinson', ['LB'], 83],
+      ['Tyler Adams', ['CDM','CM'], 82],
+      ['Weston McKennie', ['CM','CDM'], 82],
+      ['Malik Tillman', ['CAM','CM'], 82],
+      ['Timothy Weah', ['RW','RM'], 80],
+      ['Christian Pulisic', ['LW','CAM','RW'], 85],
+      ['Folarin Balogun', ['ST'], 84],
+    ],
+  },
+  'Australia': {
+    formation: '4-2-3-1',
+    players: [
+      ['Patrick Beach', ['GK'], 75],
+      ['Jason Geria', ['RB'], 72],
+      ['Harry Souttar', ['CB'], 78],
+      ['Alessandro Circati', ['CB'], 76],
+      ['Jordan Bos', ['LB'], 78],
+      ["Aiden O'Neill", ['CDM','CM'], 74],
+      ['Jackson Irvine', ['CM','CDM'], 77],
+      ['Connor Metcalfe', ['CM','CAM'], 76],
+      ['Nestory Irankunda', ['RW','LW'], 77],
+      ['Mathew Leckie', ['LW','RW'], 74],
+      ['Mohamed Toure', ['ST'], 73],
+    ],
+  },
+  'Paraguay': {
+    formation: '4-4-2',
+    players: [
+      ['Orlando Gill', ['GK'], 74],
+      ['Damian Bobadilla', ['RB','CM'], 74],
+      ['Gustavo Gomez', ['CB'], 79],
+      ['Omar Alderete', ['CB'], 78],
+      ['Juan Caceres', ['LB'], 73],
+      ['Miguel Almiron', ['RM','CAM','RW'], 78],
+      ['Mathias Villasanti', ['CM','CDM'], 75],
+      ['Matias Galarza', ['CM','CAM'], 77],
+      ['Julio Enciso', ['LM','CAM','LW'], 80],
+      ['Antonio Sanabria', ['ST'], 77],
+      ['Ramon Sosa', ['ST','LW'], 76],
+    ],
+  },
+  'Turkey': {
+    formation: '4-2-3-1',
+    players: [
+      ['Ugurcan Cakir', ['GK'], 82],
+      ['Zeki Celik', ['RB'], 79],
+      ['Merih Demiral', ['CB'], 82],
+      ['Abdulkerim Bardakci', ['CB'], 79],
+      ['Ferdi Kadioglu', ['LB','RB'], 81],
+      ['Hakan Calhanoglu', ['CDM','CM','CAM'], 85],
+      ['Orkun Kokcu', ['CM','CDM'], 81],
+      ['Arda Guler', ['CAM','RW'], 86],
+      ['Kenan Yildiz', ['LW','CAM'], 85],
+      ['Baris Alper Yilmaz', ['RW','LW','ST'], 81],
+      ['Kerem Akturkoglu', ['ST','LW','RW'], 81],
+    ],
+  },
+  'Germany': {
+    formation: '4-2-3-1',
+    players: [
+      ['Manuel Neuer', ['GK'], 86],
+      ['Joshua Kimmich', ['RB','CDM','CM'], 87],
+      ['Jonathan Tah', ['CB'], 85],
+      ['Nico Schlotterbeck', ['CB'], 85],
+      ['Nathaniel Brown', ['LB'], 79],
+      ['Aleksandar Pavlovic', ['CDM','CM'], 84],
+      ['Felix Nmecha', ['CM','CDM'], 83],
+      ['Leroy Sane', ['RW','LW'], 84],
+      ['Florian Wirtz', ['CAM','LW','CM'], 89],
+      ['Jamal Musiala', ['CAM','LW','RW'], 89],
+      ['Kai Havertz', ['ST','CAM'], 87],
+    ],
+  },
+  'Ivory Coast': {
+    formation: '4-2-3-1',
+    players: [
+      ['Yahia Fofana', ['GK'], 77],
+      ['Guela Doue', ['RB'], 77],
+      ['Wilfried Singo', ['CB','RB'], 84],
+      ['Emmanuel Agbadou', ['CB'], 79],
+      ['Ghislain Konan', ['LB'], 76],
+      ['Franck Kessie', ['CDM','CM'], 85],
+      ['Seko Fofana', ['CM','CDM'], 80],
+      ['Amad Diallo', ['RW','CAM','LW'], 85],
+      ['Ibrahim Sangare', ['CDM','CM'], 83],
+      ['Yan Diomande', ['LW','RW'], 84],
+      ['Ange-Yoan Bonny', ['ST'], 79],
+    ],
+  },
+  'Ecuador': {
+    formation: '4-3-3',
+    players: [
+      ['Hernan Galindez', ['GK'], 77],
+      ['Angelo Preciado', ['RB'], 77],
+      ['Willian Pacho', ['CB'], 89],
+      ['Joel Ordonez', ['CB'], 79],
+      ['Piero Hincapie', ['LB','CB'], 85],
+      ['Moises Caicedo', ['CDM','CM'], 87],
+      ['Pedro Vite', ['CM','CDM'], 81],
+      ['Alan Franco', ['CM','CB'], 77],
+      ['Gonzalo Plata', ['RW','LW'], 81],
+      ['Enner Valencia', ['ST'], 80],
+      ['Nilson Angulo', ['LW','RW'], 81],
+    ],
+  },
+  'Curacao': {
+    formation: '4-5-1',
+    players: [
+      ['Eloy Room', ['GK'], 77],
+      ['Shurandy Sambo', ['RB'], 73],
+      ['Cuco Martina', ['CB'], 72],
+      ['Rihairo Meulens', ['CB'], 72],
+      ['Livano Comenencia', ['LB','CM'], 76],
+      ['Leandro Bacuna', ['CM','CDM'], 74],
+      ['Juninho Bacuna', ['CM'], 74],
+      ['Kenji Gorre', ['CM','LW'], 72],
+      ['Sontje Hansen', ['RW','LW'], 74],
+      ['Tahith Chong', ['LW','RW','CAM'], 75],
+      ['Jurgen Locadia', ['ST'], 74],
+    ],
+  },
+  'Netherlands': {
+    formation: '4-2-3-1',
+    players: [
+      ['Bart Verbruggen', ['GK'], 83],
+      ['Denzel Dumfries', ['RB','RWB','RM'], 87],
+      ['Jan Paul van Hecke', ['CB'], 85],
+      ['Virgil van Dijk', ['CB'], 89],
+      ['Micky van de Ven', ['CB','LB'], 85],
+      ['Ryan Gravenberch', ['CDM','CM'], 87],
+      ['Frenkie de Jong', ['CM','CDM'], 89],
+      ['Crysencio Summerville', ['RW','LW'], 83],
+      ['Tijjani Reijnders', ['CAM','CM'], 84],
+      ['Cody Gakpo', ['LW','ST','RW'], 87],
+      ['Brian Brobbey', ['ST'], 83],
+    ],
+  },
+  'Japan': {
+    formation: '4-3-3',
+    players: [
+      ['Zion Suzuki', ['GK'], 82],
+      ['Yukinari Sugawara', ['RB','RWB'], 78],
+      ['Ko Itakura', ['CB'], 80],
+      ['Hiroki Ito', ['CB','LB'], 80],
+      ['Yuto Nagatomo', ['LB'], 74],
+      ['Ao Tanaka', ['CM','CDM'], 79],
+      ['Daichi Kamada', ['CM','CAM'], 84],
+      ['Kaishu Sano', ['CDM','CM'], 77],
+      ['Takefusa Kubo', ['RW','CAM','LW'], 83],
+      ['Ayase Ueda', ['ST'], 83],
+      ['Kaoru Mitoma', ['LW','RW'], 84],
+    ],
+  },
+  'Sweden': {
+    formation: '3-4-1-2',
+    players: [
+      ['Viktor Johansson', ['GK'], 77],
+      ['Gustaf Lagerbielke', ['CB'], 76],
+      ['Isak Hien', ['CB'], 81],
+      ['Victor Lindelof', ['CB'], 80],
+      ['Daniel Svensson', ['RWB','LWB'], 77],
+      ['Yasin Ayari', ['CM','CAM'], 80],
+      ['Jesper Karlstrom', ['CDM','CM'], 77],
+      ['Gabriel Gudmundsson', ['LWB','LB'], 77],
+      ['Anthony Elanga', ['RW','LW','CAM'], 82],
+      ['Viktor Gyokeres', ['ST'], 88],
+      ['Alexander Isak', ['ST','LW'], 89],
+    ],
+  },
+  'Tunisia': {
+    formation: '4-3-3',
+    players: [
+      ['Aymen Dahmen', ['GK'], 77],
+      ['Yan Valery', ['RB'], 75],
+      ['Montassar Talbi', ['CB'], 77],
+      ['Dylan Bronn', ['CB'], 75],
+      ['Ali Abdi', ['LB'], 75],
+      ['Ellyes Skhiri', ['CDM','CM'], 80],
+      ['Aissa Laidouni', ['CM','CDM'], 77],
+      ['Hannibal Mejbri', ['CM','CAM'], 79],
+      ['Elias Saad', ['RW','LW'], 75],
+      ['Omar Rekik', ['CB','LW'], 75],
+      ['Sebastian Tounekti', ['LW','RW','ST'], 76],
+    ],
+  },
+  'Belgium': {
+    formation: '4-2-3-1',
+    players: [
+      ['Thibaut Courtois', ['GK'], 89],
+      ['Thomas Meunier', ['RB'], 76],
+      ['Koni De Winter', ['CB'], 79],
+      ['Arthur Theate', ['CB'], 79],
+      ['Maxim De Cuyper', ['LB'], 79],
+      ['Amadou Onana', ['CDM','CM'], 84],
+      ['Youri Tielemans', ['CM','CDM'], 86],
+      ['Leandro Trossard', ['RW','LW','CAM'], 84],
+      ['Kevin De Bruyne', ['CAM','CM'], 88],
+      ['Jeremy Doku', ['LW','RW'], 88],
+      ['Romelu Lukaku', ['ST'], 85],
+    ],
+  },
+  'Egypt': {
+    formation: '4-2-3-1',
+    players: [
+      ['Mohamed El Shenawy', ['GK'], 77],
+      ['Mohamed Hany', ['RB'], 74],
+      ['Yasser Ibrahim', ['CB'], 76],
+      ['Mohamed Abdelmonem', ['CB'], 77],
+      ['Ahmed Fatouh', ['LB'], 74],
+      ['Marwan Ateya', ['CDM','CM'], 75],
+      ['Emam Ashour', ['CM','CAM'], 79],
+      ['Mahmoud Trezeguet', ['RW','LW','CAM'], 79],
+      ['Omar Marmoush', ['CAM','ST','LW'], 85],
+      ['Mohamed Salah', ['RW','LW','ST'], 89],
+      ['Ahmed Zizo', ['LW','RW'], 76],
+    ],
+  },
+  'Iran': {
+    formation: '4-2-3-1',
+    players: [
+      ['Alireza Beiranvand', ['GK'], 77],
+      ['Ramin Rezaeian', ['RB'], 76],
+      ['Shojae Khalilzadeh', ['CB'], 74],
+      ['Majid Hosseini', ['CB'], 74],
+      ['Milad Mohammadi', ['LB'], 73],
+      ['Saeid Ezatolahi', ['CDM','CM'], 75],
+      ['Ali Gholizadeh', ['CM','LW'], 74],
+      ['Alireza Jahanbakhsh', ['RW','CAM','LW'], 77],
+      ['Mehdi Ghayedi', ['CAM','RW'], 74],
+      ['Mohammad Mohebi', ['LW','RW'], 75],
+      ['Mehdi Taremi', ['ST'], 80],
+    ],
+  },
+  'New Zealand': {
+    formation: '3-4-2-1',
+    players: [
+      ['Max Crocombe', ['GK'], 73],
+      ['Tyler Bindon', ['CB'], 74],
+      ['Finn Surman', ['CB'], 73],
+      ['Nando Pijnaker', ['CB'], 72],
+      ['Tim Payne', ['RWB','RB'], 72],
+      ['Joe Bell', ['CM','CDM'], 74],
+      ['Marko Stamenic', ['CM','CDM'], 75],
+      ['Liberato Cacace', ['LWB','LB'], 75],
+      ['Eli Just', ['CAM','RW','LW'], 76],
+      ['Ben Old', ['CAM','RW'], 74],
+      ['Chris Wood', ['ST'], 78],
+    ],
+  },
+  'Spain': {
+    formation: '4-3-3',
+    players: [
+      ['Unai Simon', ['GK'], 87],
+      ['Pedro Porro', ['RB','RWB'], 84],
+      ['Pau Cubarsi', ['CB'], 84],
+      ['Aymeric Laporte', ['CB'], 84],
+      ['Marc Cucurella', ['LB'], 83],
+      ['Rodri', ['CDM','CM'], 92],
+      ['Pedri', ['CM','CDM','CAM','LW'], 91],
+      ['Fabian Ruiz', ['CM','CDM','CAM'], 86],
+      ['Lamine Yamal', ['RW','LW','CAM'], 94],
+      ['Mikel Oyarzabal', ['ST'], 86],
+      ['Alex Baena', ['LW','CAM'], 81],
+    ],
+  },
+  'Uruguay': {
+    formation: '4-3-3',
+    players: [
+      ['Sergio Rochet', ['GK'], 79],
+      ['Guillermo Varela', ['RB'], 77],
+      ['Ronald Araujo', ['CB'], 84],
+      ['Jose Maria Gimenez', ['CB'], 84],
+      ['Mathias Olivera', ['LB'], 79],
+      ['Manuel Ugarte', ['CDM','CM'], 80],
+      ['Federico Valverde', ['CM','CDM','RM','RB'], 88],
+      ['Rodrigo Bentancur', ['CM','CDM'], 81],
+      ['Agustin Canobbio', ['RW','RM'], 76],
+      ['Darwin Nunez', ['ST'], 81],
+      ['Maximiliano Araujo', ['LW','LM'], 77],
+    ],
+  },
+  'Cape Verde': {
+    formation: '4-3-3',
+    players: [
+      ['Vozinha', ['GK'], 78],
+      ['Steven Moreira', ['RB'], 77],
+      ['Roberto Lopes', ['CB'], 77],
+      ['Diney Borges', ['CB'], 76],
+      ['Sidny Lopes Cabral', ['LB','CB'], 75],
+      ['Deroy Duarte', ['CM','CDM'], 77],
+      ['Laros Duarte', ['CM','CAM'], 76],
+      ['Kevin Pina', ['CM','LW'], 76],
+      ['Ryan Mendes', ['RW','LW'], 78],
+      ['Nuno da Costa', ['ST','LW'], 77],
+      ['Jovane Cabral', ['LW','ST','RW'], 78],
+    ],
+  },
+  'Saudi Arabia': {
+    formation: '4-2-3-1',
+    players: [
+      ['Mohammed Al-Owais', ['GK'], 75],
+      ['Sultan Al-Ghannam', ['RB'], 74],
+      ['Hassan Tambakti', ['CB'], 76],
+      ['Ali Lajami', ['CB'], 73],
+      ['Abdulelah Al-Amri', ['CB','LB'], 76],
+      ['Mohammed Kanno', ['CDM','CM'], 75],
+      ['Nasser Al-Dawsari', ['CM','CDM'], 74],
+      ['Musab Al-Juwayr', ['CAM','CM'], 74],
+      ['Salem Al-Dawsari', ['LW','RW','CAM'], 78],
+      ['Firas Al-Buraikan', ['ST'], 76],
+      ['Saleh Al-Shehri', ['ST','LW'], 74],
+    ],
+  },
+  'France': {
+    formation: '4-3-3',
+    players: [
+      ['Mike Maignan', ['GK'], 87],
+      ['Jules Kounde', ['RB','CB'], 86],
+      ['William Saliba', ['CB'], 89],
+      ['Dayot Upamecano', ['CB'], 85],
+      ['Theo Hernandez', ['LB'], 84],
+      ['Aurelien Tchouameni', ['CDM','CM','CB'], 86],
+      ['Manu Kone', ['CM','CDM'], 84],
+      ['Michael Olise', ['CAM','RW','LW'], 92],
+      ['Ousmane Dembele', ['RW','LW','ST','CAM'], 92],
+      ['Kylian Mbappe', ['ST','LW'], 96],
+      ['Desire Doue', ['LW','RW','CAM'], 87],
+    ],
+  },
+  'Norway': {
+    formation: '4-3-3',
+    players: [
+      ['Orjan Nyland', ['GK'], 80],
+      ['Marcus Pedersen', ['RB'], 78],
+      ['Kristoffer Ajer', ['CB','RB'], 80],
+      ['Leo Ostigard', ['CB'], 80],
+      ['David Moller Wolfe', ['LB'], 77],
+      ['Sander Berge', ['CDM','CM'], 82],
+      ['Fredrik Aursnes', ['CM','CDM','RB'], 81],
+      ['Martin Odegaard', ['CAM','CM','RW'], 88],
+      ['Antonio Nusa', ['RW','LW'], 81],
+      ['Erling Haaland', ['ST'], 96],
+      ['Alexander Sorloth', ['ST','LW'], 83],
+    ],
+  },
+  'Senegal': {
+    formation: '4-3-3',
+    players: [
+      ['Edouard Mendy', ['GK'], 83],
+      ['Krepin Diatta', ['RB','RM'], 79],
+      ['Kalidou Koulibaly', ['CB'], 84],
+      ['Moussa Niakhate', ['CB'], 80],
+      ['Ismail Jakobs', ['LB'], 78],
+      ['Pape Gueye', ['CDM','CM'], 81],
+      ['Pape Matar Sarr', ['CM','CDM'], 82],
+      ['Idrissa Gueye', ['CM','CDM'], 80],
+      ['Ismaila Sarr', ['RW','LW'], 86],
+      ['Nicolas Jackson', ['ST'], 82],
+      ['Sadio Mane', ['LW','ST','RW'], 83],
+    ],
+  },
+  'Iraq': {
+    formation: '4-2-3-1',
+    players: [
+      ['Jalal Hassan', ['GK'], 73],
+      ['Merchas Doski', ['RB','CB'], 73],
+      ['Rebin Sulaka', ['CB'], 73],
+      ['Zaid Tahseen', ['CB'], 72],
+      ['Akam Hashim', ['LB'], 71],
+      ['Amir Al-Ammari', ['CDM','CM'], 76],
+      ['Ibrahim Bayesh', ['CM','CAM'], 73],
+      ['Youssef Amyn', ['RW','LW'], 74],
+      ['Ali Jasim', ['CAM','RW','LW'], 75],
+      ['Zidane Iqbal', ['CM','CAM'], 75],
+      ['Aymen Hussein', ['ST'], 76],
+    ],
+  },
+  'Argentina': {
+    formation: '4-3-3',
+    players: [
+      ['Emiliano Martinez', ['GK'], 88],
+      ['Nahuel Molina', ['RB'], 80],
+      ['Cristian Romero', ['CB'], 86],
+      ['Lisandro Martinez', ['CB'], 86],
+      ['Nicolas Tagliafico', ['LB'], 80],
+      ['Rodrigo De Paul', ['CM','CDM'], 83],
+      ['Enzo Fernandez', ['CM','CDM','CAM'], 85],
+      ['Alexis Mac Allister', ['CM','CDM'], 86],
+      ['Lionel Messi', ['RW','CAM','ST'], 96],
+      ['Lautaro Martinez', ['ST'], 87],
+      ['Julian Alvarez', ['ST','LW','CAM'], 88],
+    ],
+  },
+  'Austria': {
+    formation: '4-2-3-1',
+    players: [
+      ['Patrick Pentz', ['GK'], 78],
+      ['Stefan Posch', ['RB','CB'], 77],
+      ['Kevin Danso', ['CB'], 81],
+      ['Maximilian Wober', ['CB','LB'], 78],
+      ['Philipp Mwene', ['LB','RB'], 76],
+      ['Nicolas Seiwald', ['CDM','CM'], 80],
+      ['Konrad Laimer', ['CM','RB','CDM'], 83],
+      ['Marcel Sabitzer', ['CAM','CM'], 84],
+      ['Christoph Baumgartner', ['CAM','RW','CM'], 82],
+      ['Marko Arnautovic', ['ST','CAM'], 81],
+      ['Patrick Wimmer', ['LW','RW'], 79],
+    ],
+  },
+  'Algeria': {
+    formation: '4-3-3',
+    players: [
+      ['Alexis Guendouz', ['GK'], 75],
+      ['Rafik Belghali', ['RB'], 77],
+      ['Aissa Mandi', ['CB'], 78],
+      ['Ramy Bensebaini', ['CB','LB'], 80],
+      ['Rayan Ait-Nouri', ['LB','LWB'], 83],
+      ['Nabil Bentaleb', ['CDM','CM'], 77],
+      ['Fares Chaibi', ['CM','CAM'], 79],
+      ['Ismael Bennacer', ['CM','CDM'], 80],
+      ['Riyad Mahrez', ['RW','CAM','LW'], 86],
+      ['Mohamed Amoura', ['ST','LW'], 80],
+      ['Amine Gouiri', ['ST','LW'], 81],
+    ],
+  },
+  'Jordan': {
+    formation: '4-2-3-1',
+    players: [
+      ['Yazeed Abulaila', ['GK'], 72],
+      ['Mahmoud Al-Mardi', ['RB'], 71],
+      ['Yazan Al-Arab', ['CB'], 72],
+      ['Abdallah Nasib', ['CB'], 71],
+      ['Ehsan Haddad', ['LB'], 71],
+      ['Nizar Al-Rashdan', ['CDM','CM'], 75],
+      ['Noor Al-Rawabdeh', ['CM','CAM'], 73],
+      ['Mousa Al-Tamari', ['RW','LW','CAM'], 79],
+      ['Yazan Al-Naimat', ['CAM','ST','LW'], 75],
+      ['Mahmoud Al-Aardah', ['LW','RW'], 73],
+      ['Ali Olwan', ['ST'], 75],
+    ],
+  },
+  'Colombia': {
+    formation: '4-2-3-1',
+    players: [
+      ['Camilo Vargas', ['GK'], 78],
+      ['Daniel Munoz', ['RB','RM'], 85],
+      ['Davinson Sanchez', ['CB'], 82],
+      ['Jhon Lucumi', ['CB'], 81],
+      ['Deiver Machado', ['LB'], 77],
+      ['Jefferson Lerma', ['CDM','CM'], 81],
+      ['Gustavo Puerta', ['CDM','CM'], 78],
+      ['Jhon Arias', ['RW','RM'], 80],
+      ['James Rodriguez', ['CAM','CM'], 83],
+      ['Luis Diaz', ['LW','ST','RW'], 90],
+      ['Jhon Cordoba', ['ST'], 80],
+    ],
+  },
+  'Portugal': {
+    formation: '4-3-3',
+    players: [
+      ['Diogo Costa', ['GK'], 86],
+      ['Joao Cancelo', ['RB','LB','CB'], 83],
+      ['Ruben Dias', ['CB'], 88],
+      ['Renato Veiga', ['CB','CDM'], 81],
+      ['Nuno Mendes', ['LB','LWB'], 90],
+      ['Bruno Fernandes', ['CAM','CM'], 91],
+      ['Ruben Neves', ['CDM','CM'], 83],
+      ['Vitinha', ['CM','CDM','CAM'], 91],
+      ['Pedro Neto', ['RW','LW'], 84],
+      ['Rafael Leao', ['LW','ST','RW'], 85],
+      ['Cristiano Ronaldo', ['ST'], 82],
+    ],
+  },
+  'DR Congo': {
+    formation: '4-3-3',
+    players: [
+      ['Lionel Mpasi', ['GK'], 77],
+      ['Chancel Mbemba', ['CB'], 80],
+      ['Rocky Bushiri', ['CB'], 78],
+      ['Arthur Masuaku', ['LB','LWB'], 77],
+      ['Dylan Batubinsika', ['RB','CB'], 77],
+      ['Noah Sadiki', ['CM','LW','CAM'], 83],
+      ["Ngal'ayel Mukau", ['CM','CDM'], 77],
+      ['Theo Bongonda', ['RW','LW','CAM'], 77],
+      ['Meschack Elia', ['LW','RW'], 78],
+      ['Fiston Mayele', ['ST','LW'], 78],
+      ['Yoane Wissa', ['ST','LW','RW'], 83],
+    ],
+  },
+  'Uzbekistan': {
+    formation: '4-4-2',
+    players: [
+      ['Utkir Yusupov', ['GK'], 73],
+      ['Abdukodir Khusanov', ['CB'], 83],
+      ['Rustam Ashurmatov', ['CB'], 74],
+      ['Sherzod Nasrullaev', ['RB'], 73],
+      ['Khojiakbar Alijonov', ['LB','RB'], 72],
+      ['Otabek Shukurov', ['CDM','CM'], 73],
+      ['Oston Urunov', ['CM','CAM'], 75],
+      ['Abbosbek Fayzullaev', ['RW','CAM','LW'], 78],
+      ['Jaloliddin Masharipov', ['LW','CAM'], 76],
+      ['Eldor Shomurodov', ['ST'], 79],
+      ['Dostonbek Khamdamov', ['CM','LW'], 73],
+    ],
+  },
+  'England': {
+    formation: '4-2-3-1',
+    players: [
+      ['Jordan Pickford', ['GK'], 85],
+      ['Ezri Konsa', ['RB','CB'], 82],
+      ['Marc Guehi', ['CB'], 83],
+      ['John Stones', ['CB','CDM'], 82],
+      ["Nico O'Reilly", ['LB','CM'], 85],
+      ['Elliot Anderson', ['CDM','CM'], 85],
+      ['Declan Rice', ['CDM','CM'], 90],
+      ['Bukayo Saka', ['RW','LW'], 87],
+      ['Jude Bellingham', ['CAM','CM','ST'], 90],
+      ['Marcus Rashford', ['LW','ST','RW'], 85],
+      ['Harry Kane', ['ST'], 94],
+    ],
+  },
+  'Croatia': {
+    formation: '4-2-3-1',
+    players: [
+      ['Dominik Livakovic', ['GK'], 85],
+      ['Josip Stanisic', ['RB','CB'], 80],
+      ['Josip Sutalo', ['CB'], 81],
+      ['Luka Vuskovic', ['CB'], 83],
+      ['Josko Gvardiol', ['LB','CB'], 86],
+      ['Mateo Kovacic', ['CDM','CM'], 85],
+      ['Luka Modric', ['CM','CAM'], 85],
+      ['Ivan Perisic', ['LW','LWB','RW'], 80],
+      ['Luka Sucic', ['CM','CAM'], 83],
+      ['Martin Baturina', ['CAM','LW'], 82],
+      ['Ante Budimir', ['ST'], 80],
+    ],
+  },
+  'Ghana': {
+    formation: '4-2-3-1',
+    players: [
+      ['Benjamin Asare', ['GK'], 75],
+      ['Marvin Senaya', ['RB','CB'], 75],
+      ['Jonas Adjetey', ['CB'], 76],
+      ['Derrick Luckassen', ['CB'], 77],
+      ['Gideon Mensah', ['LB'], 75],
+      ['Thomas Partey', ['CDM','CM'], 83],
+      ['Elisha Owusu', ['CM','CDM'], 77],
+      ['Kamaldeen Sulemana', ['LW','RW'], 80],
+      ['Antoine Semenyo', ['RW','ST'], 85],
+      ['Caleb Yirenkyi', ['CM','CAM'], 75],
+      ['Inaki Williams', ['ST','LW'], 80],
+    ],
+  },
+  'Panama': {
+    formation: '4-4-2',
+    players: [
+      ['Orlando Mosquera', ['GK'], 73],
+      ['Michael Murillo', ['RB','CB'], 74],
+      ['Fidel Escobar', ['CB'], 73],
+      ['Carlos Harvey', ['CB'], 72],
+      ['Roderick Miller', ['LB'], 72],
+      ['Anibal Godoy', ['CDM','CM'], 74],
+      ['Adalberto Carrasquilla', ['CM','CAM'], 76],
+      ['Rolando Blackburn', ['RW','ST'], 76],
+      ['Jose Rodriguez', ['LW','CAM','LM'], 75],
+      ['Ismael Diaz', ['RW','ST'], 75],
+      ['Frederico Gallego', ['ST','LW'], 74],
+    ],
+  },
+};
+
+const WK2026_GROEPEN = {
+  'A': ['Mexico', 'South Korea', 'South Africa', 'Czech Republic'],
+  'B': ['Canada', 'Switzerland', 'Qatar', 'Bosnia'],
+  'C': ['Brazil', 'Morocco', 'Haiti', 'Scotland'],
+  'D': ['USA', 'Paraguay', 'Australia', 'Turkey'],
+  'E': ['Germany', 'Ecuador', 'Ivory Coast', 'Curacao'],
+  'F': ['Netherlands', 'Japan', 'Tunisia', 'Sweden'],
+  'G': ['Belgium', 'Egypt', 'Iran', 'New Zealand'],
+  'H': ['Spain', 'Uruguay', 'Saudi Arabia', 'Cape Verde'],
+  'I': ['France', 'Senegal', 'Norway', 'Iraq'],
+  'J': ['Argentina', 'Algeria', 'Austria', 'Jordan'],
+  'K': ['Portugal', 'Colombia', 'Uzbekistan', 'DR Congo'],
+  'L': ['England', 'Croatia', 'Ghana', 'Panama'],
+};
+
+// ═══════════════════════════════════════════════════════════════════
+// GAME ENGINE
+// ═══════════════════════════════════════════════════════════════════
+// Each slot: {pos, x, y} where x,y are 0-100 pitch coordinates (y=0 top/attack, y=100 bottom/GK)
+const FORMATIES = {
+  "4-2-3-1": [
+    {pos:"GK",  x:50, y:92},
+    {pos:"LB",  x:16, y:72}, {pos:"CB", x:38, y:76}, {pos:"CB", x:62, y:76}, {pos:"RB", x:84, y:72},
+    {pos:"CM",  x:38, y:54}, {pos:"CM", x:62, y:54},
+    {pos:"LW",  x:18, y:30}, {pos:"CAM", x:50, y:34}, {pos:"RW", x:82, y:30},
+    {pos:"ST",  x:50, y:12},
+  ],
+  "4-1-2-3": [
+    {pos:"GK",  x:50, y:92},
+    {pos:"LB",  x:16, y:72}, {pos:"CB", x:38, y:76}, {pos:"CB", x:62, y:76}, {pos:"RB", x:84, y:72},
+    {pos:"CDM", x:50, y:58},
+    {pos:"CM",  x:34, y:42}, {pos:"CM", x:66, y:42},
+    {pos:"LW",  x:18, y:20}, {pos:"ST", x:50, y:14}, {pos:"RW", x:82, y:20},
+  ],
+  "4-4-2": [
+    {pos:"GK",  x:50, y:92},
+    {pos:"LB",  x:16, y:72}, {pos:"CB", x:38, y:76}, {pos:"CB", x:62, y:76}, {pos:"RB", x:84, y:72},
+    {pos:"LM",  x:16, y:46}, {pos:"CM", x:38, y:50}, {pos:"CM", x:62, y:50}, {pos:"RM", x:84, y:46},
+    {pos:"ST",  x:38, y:16}, {pos:"ST", x:62, y:16},
+  ],
+  "5-3-2": [
+    {pos:"GK",  x:50, y:92},
+    {pos:"LWB", x:12, y:66}, {pos:"CB", x:32, y:78}, {pos:"CB", x:50, y:80}, {pos:"CB", x:68, y:78}, {pos:"RWB", x:88, y:66},
+    {pos:"CM",  x:32, y:48}, {pos:"CM", x:50, y:52}, {pos:"CM", x:68, y:48},
+    {pos:"ST",  x:38, y:18}, {pos:"ST", x:62, y:18},
+  ],
+  "3-5-2": [
+    {pos:"GK",  x:50, y:92},
+    {pos:"CB",  x:32, y:78}, {pos:"CB", x:50, y:80}, {pos:"CB", x:68, y:78},
+    {pos:"LWB", x:10, y:52}, {pos:"CM", x:34, y:56}, {pos:"CM", x:50, y:58}, {pos:"CM", x:66, y:56}, {pos:"RWB", x:90, y:52},
+    {pos:"ST",  x:38, y:20}, {pos:"ST", x:62, y:20},
+  ],
+};
+// Helper: get array of just position strings (backwards compat)
+function slotPosities(formation) { return FORMATIES[formation].map(s => s.pos); }
+
+
+const POSITIE_COMPAT = {
+  "GK":["GK"], "RB":["RB","RWB","CB"], "CB":["CB","CDM","RB","LB"], "LB":["LB","LWB","CB"],
+  "RWB":["RWB","RB","RM","LB"], "LWB":["LWB","LB","LM","RB"], "CDM":["CDM","CM","CB"],
+  "CM":["CM","CDM","CAM","RM","LM"], "CAM":["CAM","CM","LW","RW"], "RM":["RM","RW","CM","CAM"],
+  "LM":["LM","LW","CM","CAM"], "RW":["RW","RM","CAM","LW","ST"], "LW":["LW","LM","CAM","RW","ST"],
+  "ST":["ST","LW","RW","CAM"],
+};
+
+// Afgeleide posities: een RB kan ook RWB, LB ook LWB, RW ook RM, LW ook LM.
+const AFGELEIDE_POS = { RB:"RWB", LB:"LWB", RW:"RM", LW:"LM" };
+function metAfgeleidePosities(posities) {
+  const uit = [...posities];
+  for (const p of posities) {
+    const extra = AFGELEIDE_POS[p];
+    if (extra && !uit.includes(extra)) uit.push(extra);
+  }
+  return uit;
+}
+
+function kanSpelenOp(spelerPosities, slot) {
+  // Strikt, maar met afgeleide posities (RB→RWB, LB→LWB, RW→RM, LW→LM).
+  return metAfgeleidePosities(spelerPosities).includes(slot);
+}
+
+// Poisson random (Knuth)
+function poisson(lambda) {
+  const L = Math.exp(-Math.max(0.05, lambda));
+  let k = 0, p = 1;
+  do { k++; p *= Math.random(); } while (p > L);
+  return k - 1;
+}
+
+// Primaire positie (eerste tag) bepaalt de linie van een speler.
+const LINE_OF_POS = {
+  GK:"def", CB:"def", LB:"def", RB:"def", LWB:"def", RWB:"def",
+  CDM:"mid", CM:"mid", RM:"mid", LM:"mid", CAM:"mid",
+  ST:"att", LW:"att", RW:"att",
+};
+// Behouden voor compatibiliteit elders in de code:
+const ATTACK_POS = new Set(["ST","LW","RW","CAM"]);
+const DEFENSE_POS = new Set(["GK","CB","LB","RB","LWB","RWB"]);
+const MID_POS = new Set(["CM","CDM","RM","LM","CAM","LWB","RWB"]);
+
+const LINE_BASE = 4;      // referentie-aantal spelers per linie
+const LINE_COUNT_K = 0.015; // mild effect van linie-grootte
+
+function berekenSterkte(teamNaam, customPlayers) {
+  const players = customPlayers || SQUADS[teamNaam].players;
+  const att = [], dfs = [], mid = [], all = [];
+  for (const [naam, pos, r, slotPos] of players) {
+    all.push(r);
+    // Voor ons gedrafte team: de formatie-slot bepaalt de linie (slotPos).
+    // Voor landen: de primaire positie (eerste tag).
+    const bepalend = slotPos || pos[0];
+    const linie = LINE_OF_POS[bepalend] || "mid";
+    if (linie === "att") att.push(r);
+    else if (linie === "def") dfs.push(r);
+    else mid.push(r);
+  }
+  const overall = all.length ? all.reduce((x,y)=>x+y,0)/all.length : 78;
+  // Linie-rating = gemiddelde, licht bijgesteld voor het aantal spelers in die linie.
+  // Meer spelers in een linie = iets sterker bij gelijk gemiddelde, maar het verschil is klein.
+  function lineRating(arr) {
+    if (!arr.length) return overall;
+    const gem = arr.reduce((x,y)=>x+y,0)/arr.length;
+    return gem * (1 + LINE_COUNT_K * (arr.length - LINE_BASE));
+  }
+  return { attack: lineRating(att), defense: lineRating(dfs), mid: lineRating(mid), overall };
+}
+
+const BASE_RATE = 1.3, REF = 82.0;
+
+function simuleerWedstrijd(sa, sb, knockout=false) {
+  let lamA = BASE_RATE * Math.pow(sa.attack/REF, 1.5) * Math.pow(REF/sb.defense, 1.5) * (sa.mid/REF);
+  let lamB = BASE_RATE * Math.pow(sb.attack/REF, 1.5) * Math.pow(REF/sa.defense, 1.5) * (sb.mid/REF);
+  // Overall-sterkte laat sterker team vaker winnen. Knockout iets scherper dan groepsfase.
+  const diff = sa.overall - sb.overall;
+  const factor = knockout ? 0.032 : 0.026;
+  const boost = Math.max(0.6, Math.min(1.6, 1.0 + diff * factor));
+  lamA *= boost; lamB /= boost;
+  let gA = poisson(lamA), gB = poisson(lamB);
+  let extra = "", etA = 0, etB = 0;
+  if (knockout && gA === gB) {
+    etA = poisson(lamA * 0.4); etB = poisson(lamB * 0.4);
+    gA += etA; gB += etB;
+    extra = "nv";
+    if (gA === gB) { extra = "pen"; }
+  }
+  return { gA, gB, lamA, lamB, extra, etA, etB };
+}
+
+const SCORE_WEIGHT = {
+  ST:3.5, LW:2.2, RW:2.2, CAM:1.8, CM:0.9, RM:1.1, LM:1.1,
+  CDM:0.35, CB:0.2, LB:0.25, RB:0.25, LWB:0.4, RWB:0.4, GK:0.0,
+};
+
+function weightedChoice(items, weights) {
+  const total = weights.reduce((a,b)=>a+b,0);
+  if (total <= 0) return items[Math.floor(Math.random()*items.length)];
+  let r = Math.random() * total;
+  for (let i=0;i<items.length;i++){ r -= weights[i]; if (r<=0) return items[i]; }
+  return items[items.length-1];
+}
+
+function genereerScorers(nGoals, spelers, etGoals=0) {
+  if (nGoals === 0) return [];
+  const kand = [], gew = [];
+  for (const item of spelers) {
+    const naam = item[0], pos = item[1], rating = item[2];
+    const w = (rating/82.0) * Math.max(...pos.map(p => SCORE_WEIGHT[p] ?? 0.5));
+    if (w > 0) { kand.push(naam); gew.push(w); }
+  }
+  if (!kand.length) return [];
+  const scorers = [];
+  const minutes = [];
+  const nReg = Math.max(0, nGoals - etGoals);  // doelpunten in reguliere speeltijd
+  for (let i=0;i<nGoals;i++){
+    scorers.push(weightedChoice(kand, gew));
+    // Eerste nReg doelpunten vallen in minuut 1-90, de rest in de verlenging (91-120).
+    if (i < nReg) minutes.push(1 + Math.floor(Math.random()*90));
+    else minutes.push(91 + Math.floor(Math.random()*30));
+  }
+  minutes.sort((a,b)=>a-b);
+  return scorers.map((s,i)=>({naam:s, min:minutes[i]}));
+}
+
+// Penalty logic
+function penaltyVolgorde(spelers) {
+  const PREF = {ST:1.5,CAM:1.4,CM:1.3,LW:1.2,RW:1.2,LM:1.1,RM:1.1,CDM:1.0,LB:0.8,RB:0.8,CB:0.7,LWB:0.8,RWB:0.8,GK:0.0};
+  const gewogen = [];
+  for (const item of spelers) {
+    const naam = item[0], pos = item[1], rating = item[2];
+    const w = (rating/82.0) * Math.max(...pos.map(p => PREF[p] ?? 0.5));
+    if (w > 0) gewogen.push({naam, rating, w});
+  }
+  gewogen.sort((a,b)=>b.w-a.w);
+  return gewogen.map(x=>({naam:x.naam, rating:x.rating}));
+}
+
+function penaltyKans(ratingSchutter, defRatingKeeper) {
+  return Math.max(0.55, Math.min(0.91, 0.76 + (ratingSchutter-82)*0.007 - (defRatingKeeper-82)*0.003));
+}
+
+function simuleerStrafschoppen(sa, sb, spelersA, spelersB) {
+  const volgordeA = spelersA ? penaltyVolgorde(spelersA) : Array(10).fill({naam:"Speler",rating:80});
+  const volgordeB = spelersB ? penaltyVolgorde(spelersB) : Array(10).fill({naam:"Speler",rating:80});
+  let scoreA = 0, scoreB = 0;
+  const shots = [];
+  for (let i=0;i<5;i++){
+    const ka = volgordeA[i % volgordeA.length], kb = volgordeB[i % volgordeB.length];
+    const doelA = Math.random() < penaltyKans(ka.rating, sb.defense);
+    const doelB = Math.random() < penaltyKans(kb.rating, sa.defense);
+    if (doelA) scoreA++; if (doelB) scoreB++;
+    shots.push({ round:i+1, sd:false, a:{naam:ka.naam, goal:doelA}, b:{naam:kb.naam, goal:doelB}, scoreA, scoreB });
+    const rest = 4 - i;
+    if (scoreA > scoreB + rest || scoreB > scoreA + rest) break;
+  }
+  let sd = 0;
+  while (scoreA === scoreB) {
+    sd++;
+    const ka = volgordeA[(5+sd-1) % volgordeA.length], kb = volgordeB[(5+sd-1) % volgordeB.length];
+    const doelA = Math.random() < penaltyKans(ka.rating, sb.defense);
+    const doelB = Math.random() < penaltyKans(kb.rating, sa.defense);
+    if (doelA) scoreA++; if (doelB) scoreB++;
+    shots.push({ round:sd, sd:true, a:{naam:ka.naam, goal:doelA}, b:{naam:kb.naam, goal:doelB}, scoreA, scoreB });
+    if (scoreA !== scoreB) break;
+  }
+  return { shots, scoreA, scoreB, aWint: scoreA > scoreB };
+}
+
+// Draft weighting
+function weegLanden() {
+  const gew = {};
+  for (const team in SQUADS) {
+    const gem = SQUADS[team].players.reduce((a,[,,r])=>a+r,0)/11;
+    gew[team] = Math.pow(Math.max(0.1, gem-65), 3);
+  }
+  return gew;
+}
+
+function trekLand(gewichten, exclude=new Set()) {
+  const landen = Object.keys(gewichten).filter(l => !exclude.has(l));
+  const kansen = landen.map(l => gewichten[l]);
+  return weightedChoice(landen, kansen);
+}
+
+// Group stage nr-3 chance
+const KANS_NR3 = {7:0.99,6:0.96,5:0.88,4:0.66,3:0.30,2:0.10,1:0.02,0:0.00};
+function kansNr3(punten, gd) {
+  const base = KANS_NR3[Math.min(punten,7)] ?? 0.97;
+  const bonus = Math.min(0.05, Math.max(-0.05, gd*0.01));
+  return Math.max(0, Math.min(1, base + bonus));
+}
+
+// Monte Carlo group probabilities
+function berekenGroepskanssen(groep, n=1500) {
+  const tellers = {};
+  groep.forEach(l => tellers[l] = {p1:0,p2:0,p3:0,p4:0});
+  const sterktes = {};
+  groep.forEach(l => sterktes[l] = berekenSterkte(l));
+  for (let iter=0; iter<n; iter++){
+    const stand = {};
+    groep.forEach(l => stand[l] = {pts:0,gd:0,gf:0});
+    for (let i=0;i<groep.length;i++){
+      for (let j=i+1;j<groep.length;j++){
+        const a=groep[i], b=groep[j];
+        const {gA,gB} = simuleerWedstrijd(sterktes[a], sterktes[b]);
+        if (gA>gB) stand[a].pts+=3; else if (gB>gA) stand[b].pts+=3; else { stand[a].pts++; stand[b].pts++; }
+        stand[a].gd+=gA-gB; stand[b].gd+=gB-gA; stand[a].gf+=gA; stand[b].gf+=gB;
+      }
+    }
+    const gerankt = [...groep].sort((x,y) =>
+      (stand[y].pts-stand[x].pts) || (stand[y].gd-stand[x].gd) || (stand[y].gf-stand[x].gf) || (sterktes[y].overall-sterktes[x].overall));
+    gerankt.forEach((l,i) => tellers[l][`p${i+1}`]++);
+  }
+  const res = {};
+  groep.forEach(l => { res[l] = {}; for (const k in tellers[l]) res[l][k] = tellers[l][k]/n; });
+  return res;
+}
+
+let GROEP_KANSSEN = null;
+function ensureGroepskanssen() {
+  if (GROEP_KANSSEN) return GROEP_KANSSEN;
+  GROEP_KANSSEN = {};
+  for (const letter in WK2026_GROEPEN) {
+    GROEP_KANSSEN[letter] = berekenGroepskanssen(WK2026_GROEPEN[letter]);
+  }
+  return GROEP_KANSSEN;
+}
+
+const TOPLAND_DREMPEL = 85.0;  // gem. teamrating; hierboven = "topland"
+function isTopland(l) {
+  return (SQUADS[l].players.reduce((a,[,,r])=>a+r,0)/11) >= TOPLAND_DREMPEL;
+}
+
+function trekPoulegenoten() {
+  const gew = {};
+  for (const l in SQUADS) {
+    const gem = SQUADS[l].players.reduce((a,[,,r])=>a+r,0)/11;
+    gew[l] = Math.pow(gem, 1.5);
+  }
+  const sel = [];
+  while (sel.length < 3) {
+    const alTopland = sel.some(isTopland);
+    // Max. één topland onder je tegenstanders: sluit toplanden uit zodra er al één is geloot.
+    const kand = Object.keys(gew).filter(l => !sel.includes(l) && !(alTopland && isTopland(l)));
+    const kansen = kand.map(l => gew[l]);
+    sel.push(weightedChoice(kand, kansen));
+  }
+  return sel;
+}
+
+function bouwBracket(onzePos, onzePoulegenoten) {
+  ensureGroepskanssen();
+  const alGesel = new Set([...onzePoulegenoten, "Wij"]);
+  const nr1s = [], nr2s = [], nr3sAll = [];
+  for (const letter in WK2026_GROEPEN) {
+    const landen = WK2026_GROEPEN[letter];
+    const kansen = GROEP_KANSSEN[letter];
+    let besch = landen.filter(l => !alGesel.has(l));
+    if (!besch.length) continue;
+    let g1 = besch.map(l => Math.pow(kansen[l].p1, 2));
+    if (g1.reduce((a,b)=>a+b,0) > 0) {
+      const nr1 = weightedChoice(besch, g1);
+      nr1s.push(nr1); alGesel.add(nr1); besch = besch.filter(l => l!==nr1);
+    }
+    let besch2 = besch.filter(l => !alGesel.has(l));
+    if (besch2.length) {
+      let g2 = besch2.map(l => Math.pow(kansen[l].p2, 2));
+      if (g2.reduce((a,b)=>a+b,0) > 0) {
+        const nr2 = weightedChoice(besch2, g2);
+        nr2s.push(nr2); alGesel.add(nr2);
+      }
+    }
+    for (const l of landen) if (!alGesel.has(l)) nr3sAll.push([l, kansen[l].p3]);
+  }
+  const getrokkenNr3 = [];
+  for (let i=0;i<8;i++){
+    const kand = nr3sAll.filter(([l]) => !alGesel.has(l));
+    if (!kand.length) break;
+    const l3 = kand.map(x=>x[0]), k3 = kand.map(x=>x[1]);
+    if (k3.reduce((a,b)=>a+b,0) <= 0) break;
+    const g = weightedChoice(l3, k3);
+    getrokkenNr3.push(g); alGesel.add(g);
+  }
+  let bracket = [["Wij", `#${onzePos}`]];
+  nr1s.slice(0,11).forEach(l => bracket.push([l,"#1"]));
+  nr2s.slice(0,12).forEach(l => bracket.push([l,"#2"]));
+  getrokkenNr3.slice(0,8).forEach(l => bracket.push([l,"#3"]));
+  const rest = bracket.slice(1);
+  for (let i=rest.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [rest[i],rest[j]]=[rest[j],rest[i]]; }
+  return [bracket[0], ...rest];
+}
+
+const RONDES = ["Ronde van 32","Ronde van 16","Kwartfinale","Halve finale","Finale"];
+
+// ═══════════════════════════════════════════════════════════════════
+// GEDEELD SCOREBORD (JSONBin.io)
+// ═══════════════════════════════════════════════════════════════════
+//
+// De instellingen (bin-ID + key) staan NIET in dit bestand, maar in een
+// apart bestandje "config.js" ernaast. Zo kun je dit HTML-bestand vrij
+// vervangen door een nieuwe versie zonder je key opnieuw in te vullen.
+// Zie config.js voor de uitleg. Ontbreekt config.js? Dan draait het
+// scorebord automatisch lokaal (alleen zichtbaar in je eigen browser).
+const SCOREBORD_CONFIG = (typeof window !== "undefined" && window.WK_CONFIG)
+  ? window.WK_CONFIG
+  : { MODE: "local", BIN_ID: "", API_KEY: "" };
+
+const JSONBIN_BASE = "https://api.jsonbin.io/v3/b";
+
+function jsonbinKlaar() {
+  return SCOREBORD_CONFIG.MODE === "jsonbin"
+    && SCOREBORD_CONFIG.BIN_ID && !SCOREBORD_CONFIG.BIN_ID.startsWith("VUL_")
+    && SCOREBORD_CONFIG.API_KEY && !SCOREBORD_CONFIG.API_KEY.startsWith("VUL_");
+}
+
+// --- JSONBin: hele ranglijst is één array in de bin ---
+async function jsonbinLees() {
+  const res = await fetch(`${JSONBIN_BASE}/${SCOREBORD_CONFIG.BIN_ID}/latest`, {
+    method: "GET",
+    headers: { "X-Access-Key": SCOREBORD_CONFIG.API_KEY, "X-Bin-Meta": "false" },
+  });
+  if (!res.ok) throw new Error(`JSONBin lees-fout ${res.status}`);
+  const data = await res.json();
+  // Body kan zijn: kale array, {spelers:[...]}, of (met meta) {record:...}
+  let inner = data;
+  if (inner && !Array.isArray(inner) && inner.record !== undefined) inner = inner.record;
+  if (inner && !Array.isArray(inner) && Array.isArray(inner.spelers)) inner = inner.spelers;
+  return Array.isArray(inner) ? inner : [];
+}
+
+async function jsonbinSchrijf(spelers) {
+  const res = await fetch(`${JSONBIN_BASE}/${SCOREBORD_CONFIG.BIN_ID}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json", "X-Access-Key": SCOREBORD_CONFIG.API_KEY },
+    body: JSON.stringify({ spelers }),
+  });
+  if (!res.ok) throw new Error(`JSONBin schrijf-fout ${res.status}`);
+  return true;
+}
+
+// --- Lokale fallback (per browser) ---
+function localLees() {
+  try { return JSON.parse(localStorage.getItem("wk_scorebord") || "[]"); }
+  catch(e) { return []; }
+}
+function localSchrijf(spelers) {
+  try { localStorage.setItem("wk_scorebord", JSON.stringify(spelers)); } catch(e) {}
+}
+
+function voegResultaatToe(spelers, naam, teamRating, goals, isChampion) {
+  const sleutel = naam.toLowerCase().trim();
+  let p = spelers.find(x => (x.naam || "").toLowerCase().trim() === sleutel);
+  if (!p) { p = { naam, games:0, totalRating:0, bestRating:0, goals:0, championships:0 }; spelers.push(p); }
+  p.games += 1;
+  p.totalRating += teamRating;
+  p.bestRating = Math.max(p.bestRating || 0, teamRating);  // hoogste teamrating uit één toernooi
+  p.goals += goals;
+  if (isChampion) p.championships += 1;
+  p.naam = naam;
+  return p;
+}
+
+// Bestaat deze naam al op het (gedeelde) scorebord?
+async function naamBestaat(naam) {
+  const sleutel = naam.toLowerCase().trim();
+  try {
+    const spelers = await loadScoreboard();
+    return spelers.some(x => (x.naam || "").toLowerCase().trim() === sleutel);
+  } catch(e) { return false; }
+}
+
+async function saveResult(naam, teamRating, goals, isChampion) {
+  // JSONBin: lees hele lijst, werk speler bij, schrijf terug
+  if (jsonbinKlaar()) {
+    try {
+      const spelers = await jsonbinLees();
+      const p = voegResultaatToe(spelers, naam, teamRating, goals, isChampion);
+      await jsonbinSchrijf(spelers);
+      return p;
+    } catch(e) {
+      console.error("JSONBin opslaan mislukt, val terug op lokaal:", e);
+      // val door naar lokaal zodat de score niet verloren gaat
+    }
+  }
+  // Lokaal
+  try {
+    const spelers = localLees();
+    const p = voegResultaatToe(spelers, naam, teamRating, goals, isChampion);
+    localSchrijf(spelers);
+    return p;
+  } catch(e) { console.error("lokaal opslaan mislukt", e); return null; }
+}
+
+async function loadScoreboard() {
+  if (jsonbinKlaar()) {
+    try { return await jsonbinLees(); }
+    catch(e) { console.error("JSONBin laden mislukt, val terug op lokaal:", e); }
+  }
+  return localLees();
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// UI HELPERS
+// ═══════════════════════════════════════════════════════════════════
+function ratingColor(r) {
+  if (r >= 90) return "var(--gold)";
+  if (r >= 85) return "var(--grass)";
+  if (r >= 80) return "#5DD9C1";
+  if (r >= 76) return "var(--text)";
+  return "var(--muted)";
+}
+
+function RatingBadge({ r, size="md" }) {
+  const dims = size === "sm" ? {w:26,h:26,fs:13} : size === "lg" ? {w:44,h:44,fs:20} : {w:32,h:32,fs:15};
+  return (
+    <div className="cond" style={{
+      width:dims.w, height:dims.h, minWidth:dims.w, display:"flex", alignItems:"center", justifyContent:"center",
+      background: r>=90 ? "rgba(255,182,39,0.15)" : r>=85 ? "rgba(0,212,106,0.15)" : "var(--panel2)",
+      border: `1.5px solid ${ratingColor(r)}`, borderRadius:8, color:ratingColor(r),
+      fontWeight:800, fontSize:dims.fs, letterSpacing:"-0.02em",
+    }}>{r}</div>
+  );
+}
+
+function PosTag({ pos }) {
+  return <span className="mono" style={{
+    fontSize:10, fontWeight:700, padding:"2px 5px", borderRadius:4,
+    background:"var(--panel2)", color:"var(--muted)", letterSpacing:"0.03em",
+  }}>{pos}</span>;
+}
+
+function Flag({ team, size=20 }) {
+  // Real emoji flags for countries; "You FC" gets a green badge
+  if (team === "You FC" || team === "Jij" || team === "Wij") {
+    return (
+      <div className="cond" style={{
+        width:size, height:size, minWidth:size, borderRadius:"50%",
+        background:"var(--grass)", border:"1px solid var(--grass-dim)",
+        display:"flex", alignItems:"center", justifyContent:"center",
+        fontSize:size*0.44, fontWeight:900, color:"#03260F",
+      }}>★</div>
+    );
+  }
+  const emoji = flagOf(team);
+  return (
+    <span style={{fontSize:size*0.95, lineHeight:1, display:"inline-flex", alignItems:"center",
+      width:size, height:size, minWidth:size, justifyContent:"center"}}>{emoji}</span>
+  );
+}
+
+function Btn({ children, onClick, variant="primary", disabled, style }) {
+  const base = {
+    fontFamily:"'Barlow Condensed', sans-serif", fontWeight:700, fontSize:18, letterSpacing:"0.02em",
+    textTransform:"uppercase", padding:"13px 28px", borderRadius:10, border:"none", cursor: disabled?"not-allowed":"pointer",
+    transition:"all 0.15s ease", opacity: disabled?0.4:1, ...style,
+  };
+  const variants = {
+    primary: { background:"var(--grass)", color:"#03260F" },
+    gold: { background:"var(--gold)", color:"#2B1A00" },
+    ghost: { background:"transparent", color:"var(--text)", border:"1.5px solid var(--line)" },
+    danger: { background:"var(--red)", color:"#2B0009" },
+  };
+  const [hover, setHover] = useState(false);
+  const hoverStyle = hover && !disabled ? { transform:"translateY(-2px)", filter:"brightness(1.08)" } : {};
+  return (
+    <button onClick={disabled?undefined:onClick} onMouseEnter={()=>setHover(true)} onMouseLeave={()=>setHover(false)}
+      style={{...base, ...variants[variant], ...hoverStyle}}>{children}</button>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// SCREEN: START
+// ═══════════════════════════════════════════════════════════════════
+function StartScreen({ naam, setNaam, onStart, onScoreboard, loading, naamPrompt, onBevestigNaam, onAnderNaam }) {
+  return (
+    <div style={{minHeight:"100vh", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", padding:"24px", position:"relative"}}>
+      <div style={{position:"absolute", top:0, left:0, right:0, height:"55vh",
+        background:"radial-gradient(ellipse at 50% 0%, rgba(0,212,106,0.12), transparent 65%)", pointerEvents:"none"}}/>
+      <div style={{animation:"fadeUp 0.6s ease", textAlign:"center", zIndex:1, maxWidth:560}}>
+        <div className="mono" style={{color:"var(--grass)", fontSize:13, fontWeight:700, letterSpacing:"0.35em", marginBottom:20}}>
+          FIFA WORLD CUP 2026
+        </div>
+        <h1 className="cond" style={{fontSize:"clamp(52px, 12vw, 104px)", fontWeight:900, color:"var(--white)", lineHeight:0.88, letterSpacing:"-0.02em", marginBottom:8}}>
+          DRAFT<br/><span style={{color:"var(--grass)"}}>CHALLENGE</span>
+        </h1>
+        <p style={{color:"var(--text)", fontSize:17, lineHeight:1.55, margin:"24px auto 40px", maxWidth:440}}>
+          Bouw je ultieme WK-team! Kies je formatie en draft je elftal bijeen: elke ronde loot je een WK-land en pik je één speler uit hun selectie voor een plek in jouw team. Bouw een gebalanceerd team met sterke linies, overleef een loodzware groepsfase en knok je naar de wereldtitel.
+        </p>
+        {naamPrompt ? (
+          <div style={{display:"flex", flexDirection:"column", gap:16, alignItems:"center", animation:"popIn 0.3s ease",
+            background:"var(--panel)", border:"1.5px solid var(--gold)", borderRadius:14, padding:"24px 22px", maxWidth:420, margin:"0 auto"}}>
+            <div className="cond" style={{fontSize:24, fontWeight:800, color:"var(--white)", lineHeight:1.1}}>
+              De naam "{naam.trim()}" bestaat al
+            </div>
+            <div style={{color:"var(--text)", fontSize:15, lineHeight:1.5}}>
+              Ben jij dit? Dan tellen je resultaten bij je bestaande scores op. Speel je met vrienden? Kies dan een unieke naam zodat jullie scores niet samengevoegd worden.
+            </div>
+            <div style={{display:"flex", gap:12, flexWrap:"wrap", justifyContent:"center"}}>
+              <Btn onClick={onBevestigNaam} disabled={loading}>{loading ? "Laden..." : "Ja, dat ben ik"}</Btn>
+              <Btn variant="ghost" onClick={onAnderNaam}>Andere naam</Btn>
+            </div>
+          </div>
+        ) : (
+        <div style={{display:"flex", flexDirection:"column", gap:14, alignItems:"center"}}>
+          <input value={naam} onChange={e=>setNaam(e.target.value)} placeholder="Jouw naam"
+            onKeyDown={e=>{ if(e.key==='Enter' && naam.trim()) onStart(); }}
+            style={{fontFamily:"'Barlow Condensed', sans-serif", fontSize:22, fontWeight:600, textAlign:"center",
+              background:"var(--panel)", border:"1.5px solid var(--line)", borderRadius:10, color:"var(--white)",
+              padding:"12px 20px", width:280, outline:"none"}}/>
+          <div style={{display:"flex", gap:12, flexWrap:"wrap", justifyContent:"center"}}>
+            <Btn onClick={onStart} disabled={!naam.trim() || loading}>
+              {loading ? "Laden..." : "Start je toernooi"}
+            </Btn>
+            <Btn variant="ghost" onClick={onScoreboard}>Scorebord</Btn>
+          </div>
+        </div>
+        )}
+      </div>
+      <div className="mono" style={{position:"absolute", bottom:20, color:"var(--muted)", fontSize:11, letterSpacing:"0.1em"}}>
+        48 LANDEN · 528 SPELERS · ÉÉN TROFEE
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// SCREEN: FORMATION PICKER
+// ═══════════════════════════════════════════════════════════════════
+function FormationScreen({ onPick }) {
+  const formations = Object.keys(FORMATIES);
+  const descriptions = {
+    "4-2-3-1": "Gebalanceerd — nummer 10 achter de spits",
+    "4-1-2-3": "Aanvallend — drie voorin, één controleur",
+    "4-4-2": "Klassiek — twee spitsen",
+    "5-3-2": "Defensief — vijf achterin",
+    "3-5-2": "Middenveld-dominant",
+  };
+  return (
+    <div style={{maxWidth:720, margin:"0 auto", padding:"48px 24px", animation:"fadeUp 0.5s ease"}}>
+      <div className="mono" style={{color:"var(--grass)", fontSize:12, fontWeight:700, letterSpacing:"0.3em", marginBottom:10}}>STAP 1 / 3</div>
+      <h2 className="cond" style={{fontSize:44, fontWeight:800, color:"var(--white)", marginBottom:36}}>Kies je opstelling</h2>
+      <div style={{display:"grid", gridTemplateColumns:"repeat(auto-fit, minmax(300px, 1fr))", gap:16}}>
+        {formations.map((f, i) => (
+          <FormationCard key={f} formation={f} desc={descriptions[f]} onPick={()=>onPick(f)} delay={i*0.08}/>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function FormationCard({ formation, desc, onPick, delay }) {
+  const [hover, setHover] = useState(false);
+  return (
+    <div onClick={onPick} onMouseEnter={()=>setHover(true)} onMouseLeave={()=>setHover(false)}
+      style={{background: hover?"var(--panel2)":"var(--panel)", border:`1.5px solid ${hover?"var(--grass)":"var(--line)"}`,
+        borderRadius:14, padding:"24px", cursor:"pointer", transition:"all 0.18s ease",
+        transform: hover?"translateY(-3px)":"none", animation:`fadeUp 0.5s ease ${delay}s both`}}>
+      <div style={{display:"flex", justifyContent:"space-between", alignItems:"baseline", marginBottom:16}}>
+        <div className="cond" style={{fontSize:40, fontWeight:900, color: hover?"var(--grass)":"var(--white)", letterSpacing:"-0.02em"}}>{formation}</div>
+      </div>
+      <MiniPitch formation={formation} />
+    </div>
+  );
+}
+
+function MiniPitch({ formation }) {
+  const slots = FORMATIES[formation];
+  return (
+    <div style={{position:"relative", background:"linear-gradient(180deg, #0C3D22, #0A2E1A)", borderRadius:8,
+      height:150, border:"1px solid rgba(0,212,106,0.15)", overflow:"hidden"}}>
+      {/* halfway line */}
+      <div style={{position:"absolute", left:0, right:0, top:"50%", height:1, background:"rgba(255,255,255,0.08)"}}/>
+      {slots.map((s,i)=>{
+        const cat = s.pos==="GK"?"GK":DEFENSE_POS.has(s.pos)?"DEF":ATTACK_POS.has(s.pos)?"ATT":"MID";
+        return (
+          <div key={i} style={{position:"absolute", left:`${s.x}%`, top:`${s.y}%`, transform:"translate(-50%,-50%)",
+            width:10, height:10, borderRadius:"50%",
+            background: cat==="ATT"?"var(--grass)":cat==="GK"?"var(--gold)":"rgba(255,255,255,0.75)"}}/>
+        );
+      })}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// SCREEN: DRAFT
+// ═══════════════════════════════════════════════════════════════════
+function DraftScreen({ formation, onComplete }) {
+  const slots = FORMATIES[formation];
+  const [gevuld, setGevuld] = useState(Array(slots.length).fill(null));
+  const [skips, setSkips] = useState(3);
+  const [currentLand, setCurrentLand] = useState(null);
+  const [beschikbaar, setBeschikbaar] = useState([]);
+  const [posKeuze, setPosKeuze] = useState(null); // {speler, slots:[idx,...]}
+  const [spinning, setSpinning] = useState(false);
+  const [spinLand, setSpinLand] = useState(null); // land dat tijdens de animatie flitst
+  const [spinLocked, setSpinLocked] = useState(false); // true zodra op het echte land geland
+  const spinTimers = useRef([]);
+  const gewichten = useMemo(() => weegLanden(), []);
+
+  // Ruim lopende spin-timers op als de component verdwijnt.
+  useEffect(() => () => { spinTimers.current.forEach(clearTimeout); }, []);
+
+  // Track which player names are already picked (per country: "Land::Naam")
+  function gekozenKey(land, naam) { return `${land}::${naam}`; }
+  function gekozenSet(g) {
+    const s = new Set();
+    g.forEach(p => { if (p) s.add(gekozenKey(p.land, p.naam)); });
+    return s;
+  }
+
+  function beschikbareSpelers(land, openSlotIdxs, gekozen) {
+    const besch = [];
+    for (const [naam, posities, rating] of SQUADS[land].players) {
+      if (gekozen.has(gekozenKey(land, naam))) continue; // al gekozen → uitsluiten
+      const passend = openSlotIdxs.filter(i => kanSpelenOp(posities, slots[i].pos));
+      if (passend.length) besch.push({ naam, posities, rating, passend });
+    }
+    return besch;
+  }
+
+  function trekNieuwLandVoor(g) {
+    const openIdxs = g.map((v,i)=>v===null?i:-1).filter(i=>i>=0);
+    if (openIdxs.length === 0) return;
+    const gekozen = gekozenSet(g);
+    let tries = 0;
+    while (tries < 300) {
+      tries++;
+      const land = trekLand(gewichten);
+      const besch = beschikbareSpelers(land, openIdxs, gekozen);
+      if (besch.length) { startSpin(land, besch); return; }
+    }
+  }
+
+  // Roulette-animatie: flits snel door willekeurige landen, vertraag, en land op het echte land.
+  function startSpin(finalLand, besch) {
+    spinTimers.current.forEach(clearTimeout);
+    spinTimers.current = [];
+    setSpinning(true);
+    setSpinLocked(false);
+    setCurrentLand(null);
+    setBeschikbaar(besch);
+
+    const alleLanden = Object.keys(SQUADS);
+    // Steeds langzamer wordende intervallen (in ms) — geeft een natuurlijk "uitrollend" gevoel.
+    const stappen = [60,60,60,70,70,80,90,100,120,140,170,200,240,290];
+    let t = 0;
+    stappen.forEach((dt, i) => {
+      t += dt;
+      spinTimers.current.push(setTimeout(() => {
+        if (i === stappen.length - 1) {
+          // Laatste flits: land op het echte land, maar blijf de grote vlag nog even tonen.
+          setSpinLand(finalLand);
+          setSpinLocked(true);
+        } else {
+          // Flitsende vlaggen ook gewogen trekken, zodat sterke landen net zo vaak voorbijkomen
+          // als bij de echte loting (puur visueel — heeft geen invloed op het gekozen land).
+          setSpinLand(trekLand(gewichten));
+        }
+      }, t));
+    });
+    // Houd het gekozen land nog ~0,9s groot in beeld, onthul dan pas de spelers.
+    spinTimers.current.push(setTimeout(() => {
+      setCurrentLand(finalLand);
+      setSpinning(false);
+    }, t + 900));
+  }
+
+  useEffect(() => { trekNieuwLandVoor(gevuld); }, []);
+
+  function kiesSpeler(sp) {
+    if (sp.passend.length === 1) {
+      plaats(sp, sp.passend[0]);
+    } else {
+      setPosKeuze({ speler: sp, slots: sp.passend });
+    }
+  }
+
+  function plaats(sp, slotIdx) {
+    const ng = [...gevuld];
+    ng[slotIdx] = { naam: sp.naam, posities: sp.posities, rating: sp.rating, land: currentLand, slotPos: slots[slotIdx].pos };
+    setGevuld(ng);
+    setPosKeuze(null);
+    if (ng.every(x => x !== null)) {
+      setTimeout(() => onComplete(ng), 400);
+    } else {
+      setTimeout(() => trekNieuwLandVoor(ng), 120);
+    }
+  }
+
+  function doSkip() {
+    if (skips <= 0) return;
+    setSkips(skips - 1);
+    setPosKeuze(null);
+    trekNieuwLandVoor(gevuld);
+  }
+
+  const nGevuld = gevuld.filter(x=>x!==null).length;
+  const progress = (nGevuld / slots.length) * 100;
+
+  return (
+    <div style={{maxWidth:1060, margin:"0 auto", padding:"32px 20px 60px"}}>
+      {/* Progress header */}
+      <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8}}>
+        <div className="mono" style={{color:"var(--grass)", fontSize:12, fontWeight:700, letterSpacing:"0.2em"}}>
+          PICK {Math.min(nGevuld+1, slots.length)} / {slots.length}
+        </div>
+        <div className="mono" style={{fontSize:12, color: skips>0?"var(--gold)":"var(--muted)", fontWeight:700}}>
+          {skips} SKIP{skips!==1?"S":""} OVER
+        </div>
+      </div>
+      <div style={{height:5, background:"var(--panel)", borderRadius:3, overflow:"hidden", marginBottom:28}}>
+        <div style={{height:"100%", width:`${progress}%`, background:"var(--grass)", transition:"width 0.4s ease", borderRadius:3}}/>
+      </div>
+
+      <div style={{display:"grid", gridTemplateColumns:"minmax(0, 1fr) minmax(300px, 380px)", gap:24, alignItems:"start"}}>
+        {/* LEFT: country + players OR position picker */}
+        <div>
+          {spinning && (
+            <div style={{animation:"fadeIn 0.2s ease"}}>
+              <div className="mono" style={{fontSize:11, letterSpacing:"0.2em", fontWeight:700, marginBottom:16,
+                color: spinLocked ? "var(--grass)" : "var(--muted)"}}>
+                {spinLocked ? "JOUW LAND!" : "LAND WORDT GELOOT..."}
+              </div>
+              <div style={{display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center",
+                minHeight:180, gap:16, background:"var(--bg2)", borderRadius:16, padding:"28px",
+                border:`1px solid ${spinLocked ? "var(--grass)" : "var(--line)"}`,
+                transition:"border-color 0.2s ease"}}>
+                <div key={spinLand} style={{animation: spinLocked ? "popIn 0.35s ease" : "popIn 0.12s ease",
+                  transform: spinLocked ? "scale(1.1)" : "none", transition:"transform 0.3s ease"}}>
+                  <Flag team={spinLand || "Brazil"} size={72}/>
+                </div>
+                <div key={"n"+spinLand} className="cond" style={{fontSize: spinLocked?34:30, fontWeight:800,
+                  color: spinLocked ? "var(--grass)" : "var(--white)", lineHeight:1,
+                  animation: spinLocked ? "popIn 0.35s ease" : "popIn 0.12s ease"}}>
+                  {spinLand || "..."}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {currentLand && !posKeuze && !spinning && (
+            <div key={currentLand} style={{animation:"popIn 0.35s ease"}}>
+              <div style={{display:"flex", alignItems:"center", gap:12, marginBottom:18}}>
+                <Flag team={currentLand} size={40}/>
+                <div>
+                  <div className="mono" style={{fontSize:11, color:"var(--muted)", letterSpacing:"0.2em", fontWeight:700}}>JOUW LAND</div>
+                  <div className="cond" style={{fontSize:32, fontWeight:800, color:"var(--white)", lineHeight:1}}>{currentLand}</div>
+                </div>
+              </div>
+              <div style={{display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(250px, 1fr))", gap:10}}>
+                {beschikbaar.map((sp,i)=>(
+                  <PlayerPick key={sp.naam} sp={sp} onClick={()=>kiesSpeler(sp)} delay={i*0.03}/>
+                ))}
+              </div>
+              {skips > 0 && (
+                <div style={{marginTop:20}}>
+                  <button onClick={doSkip} className="cond" style={{
+                    background:"transparent", border:"1.5px solid var(--line)", color:"var(--muted)",
+                    padding:"9px 22px", borderRadius:8, cursor:"pointer", fontSize:15, fontWeight:700,
+                    textTransform:"uppercase", letterSpacing:"0.05em", transition:"all 0.15s"}}
+                    onMouseEnter={e=>{e.target.style.borderColor="var(--gold)"; e.target.style.color="var(--gold)";}}
+                    onMouseLeave={e=>{e.target.style.borderColor="var(--line)"; e.target.style.color="var(--muted)";}}>
+                    ⏭ Land overslaan ({skips})
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {posKeuze && (
+            <div style={{animation:"popIn 0.3s ease"}}>
+              <div className="cond" style={{fontSize:26, fontWeight:800, color:"var(--white)", marginBottom:4}}>
+                Waar zet je {posKeuze.speler.naam}?
+              </div>
+              <div style={{color:"var(--text)", marginBottom:18, fontSize:15}}>
+                Klik op een groene positie in je opstelling.
+              </div>
+              <SelectablePitch formation={formation} gevuld={gevuld}
+                highlightSlots={posKeuze.slots} onPickSlot={(idx)=>plaats(posKeuze.speler, idx)}/>
+              <div style={{marginTop:14, textAlign:"center"}}>
+                <button onClick={()=>setPosKeuze(null)} className="cond" style={{
+                  background:"transparent", border:"none", color:"var(--muted)", cursor:"pointer",
+                  fontSize:14, fontWeight:700, textTransform:"uppercase", letterSpacing:"0.05em"}}>
+                  ← Andere speler kiezen
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* RIGHT: live squad as pitch */}
+        <div style={{background:"var(--bg2)", border:"1px solid var(--line)", borderRadius:14, padding:"16px"}}>
+          <div className="mono" style={{fontSize:11, color:"var(--muted)", letterSpacing:"0.2em", fontWeight:700, marginBottom:12}}>
+            JOUW ELFTAL · {formation}
+          </div>
+          <SelectablePitch formation={formation} gevuld={gevuld} highlightSlots={[]} onPickSlot={null} compact/>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Pitch that can render filled players and optionally highlight/select empty slots
+function SelectablePitch({ formation, gevuld, highlightSlots, onPickSlot, compact }) {
+  const slots = FORMATIES[formation];
+  const hs = new Set(highlightSlots || []);
+  return (
+    <div style={{position:"relative", width:"100%", aspectRatio: compact ? "3/4" : "4/5",
+      background:"linear-gradient(180deg, #0C3D22 0%, #08301A 100%)", borderRadius:12,
+      border:"1px solid rgba(0,212,106,0.2)", overflow:"hidden"}}>
+      {/* pitch markings */}
+      <div style={{position:"absolute", left:0, right:0, top:"50%", height:1, background:"rgba(255,255,255,0.1)"}}/>
+      <div style={{position:"absolute", left:"50%", top:"50%", transform:"translate(-50%,-50%)",
+        width:"22%", aspectRatio:"1", border:"1px solid rgba(255,255,255,0.1)", borderRadius:"50%"}}/>
+      <div style={{position:"absolute", left:"28%", right:"28%", bottom:0, height:"14%", border:"1px solid rgba(255,255,255,0.1)", borderBottom:"none"}}/>
+      <div style={{position:"absolute", left:"28%", right:"28%", top:0, height:"14%", border:"1px solid rgba(255,255,255,0.1)", borderTop:"none"}}/>
+
+      {slots.map((s,i)=>{
+        const p = gevuld[i];
+        const isHi = hs.has(i);
+        const clickable = isHi && onPickSlot;
+        return (
+          <PitchSlot key={i} slot={s} player={p} highlight={isHi} compact={compact}
+            onClick={clickable ? ()=>onPickSlot(i) : null}/>
+        );
+      })}
+    </div>
+  );
+}
+
+function PitchSlot({ slot, player, highlight, onClick, compact }) {
+  const [hover, setHover] = useState(false);
+  const size = compact ? 34 : 42;
+  const filled = !!player;
+  const bg = highlight ? "var(--grass)" : filled
+    ? (player.rating>=88?"var(--gold)":player.rating>=83?"var(--grass)":"var(--panel2)")
+    : "rgba(19,31,71,0.7)";
+  const border = highlight ? "var(--grass)" : filled
+    ? (player.rating>=88?"var(--gold)":player.rating>=83?"var(--grass)":"var(--line)")
+    : "rgba(122,135,173,0.4)";
+  return (
+    <div style={{position:"absolute", left:`${slot.x}%`, top:`${slot.y}%`, transform:"translate(-50%,-50%)",
+      display:"flex", flexDirection:"column", alignItems:"center", gap:2,
+      cursor: onClick?"pointer":"default", zIndex: highlight?5:1}}
+      onClick={onClick} onMouseEnter={()=>setHover(true)} onMouseLeave={()=>setHover(false)}>
+      <div className="cond" style={{
+        width:size, height:size, minWidth:size, borderRadius:"50%",
+        background: hover&&onClick ? "var(--white)" : bg,
+        border:`2px solid ${border}`,
+        display:"flex", alignItems:"center", justifyContent:"center",
+        fontSize: compact?14:17, fontWeight:900,
+        color: filled ? (player.rating>=83?"#03260F":"var(--white)") : (highlight?"#03260F":"var(--muted)"),
+        boxShadow: highlight?"0 0 0 4px rgba(0,212,106,0.25)":"none",
+        animation: highlight?"pulse 1.4s infinite":"none",
+        transition:"all 0.15s"}}>
+        {filled ? player.rating : (highlight ? "+" : slot.pos)}
+      </div>
+      {filled && !compact && (
+        <div style={{fontSize:10, fontWeight:600, color:"var(--white)", textAlign:"center", lineHeight:1.1,
+          maxWidth:64, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis",
+          textShadow:"0 1px 3px rgba(0,0,0,0.8)"}}>
+          {player.naam.split(' ').slice(-1)[0]}
+        </div>
+      )}
+      {filled && (
+        <div style={{fontSize: compact?9:10, display:"flex", alignItems:"center", gap:3, maxWidth: compact?58:72,
+          whiteSpace:"nowrap", overflow:"hidden", textShadow:"0 1px 3px rgba(0,0,0,0.8)"}}>
+          {compact && (
+            <span style={{fontWeight:600, color:"var(--white)", overflow:"hidden", textOverflow:"ellipsis"}}>
+              {player.naam.split(' ').slice(-1)[0]}
+            </span>
+          )}
+          <span>{flagOf(player.land)}</span>
+        </div>
+      )}
+      {!filled && (
+        <div className="mono" style={{fontSize:9, fontWeight:700, color: highlight?"var(--grass)":"var(--muted)",
+          textShadow:"0 1px 2px rgba(0,0,0,0.6)"}}>{slot.pos}</div>
+      )}
+    </div>
+  );
+}
+
+function PlayerPick({ sp, onClick, delay }) {
+  const [hover, setHover] = useState(false);
+  return (
+    <div onClick={onClick} onMouseEnter={()=>setHover(true)} onMouseLeave={()=>setHover(false)}
+      style={{display:"flex", alignItems:"center", gap:12, padding:"12px 14px",
+        background: hover?"var(--panel2)":"var(--panel)", border:`1.5px solid ${hover?"var(--grass)":"var(--line)"}`,
+        borderRadius:10, cursor:"pointer", transition:"all 0.15s", transform: hover?"translateX(3px)":"none",
+        animation:`slideInLeft 0.3s ease ${delay}s both`}}>
+      <RatingBadge r={sp.rating}/>
+      <div style={{flex:1, minWidth:0}}>
+        <div style={{fontWeight:600, fontSize:15, color:"var(--white)", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis"}}>{sp.naam}</div>
+        <div style={{display:"flex", gap:4, marginTop:3}}>
+          {sp.posities.map(p=><PosTag key={p} pos={p}/>)}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SquadList({ gevuld, slots }) {
+  return (
+    <div style={{background:"var(--bg2)", border:"1px solid var(--line)", borderRadius:14, padding:"18px"}}>
+      <div className="mono" style={{fontSize:11, color:"var(--muted)", letterSpacing:"0.2em", fontWeight:700, marginBottom:14}}>
+        JOUW ELFTAL
+      </div>
+      <div style={{display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(220px, 1fr))", gap:8}}>
+        {slots.map((slot,i)=>{
+          const p = gevuld[i];
+          return (
+            <div key={i} style={{display:"flex", alignItems:"center", gap:10, padding:"8px 10px",
+              background: p?"var(--panel)":"transparent", border:`1px solid ${p?"var(--line)":"rgba(38,53,104,0.4)"}`,
+              borderRadius:8, minHeight:44}}>
+              <div className="mono" style={{fontSize:11, fontWeight:700, color: p?"var(--grass)":"var(--muted)", width:32}}>{slot.pos}</div>
+              {p ? (
+                <>
+                  <div style={{flex:1, minWidth:0}}>
+                    <div style={{fontSize:13, fontWeight:600, color:"var(--white)", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis"}}>{p.naam}</div>
+                    <div style={{fontSize:10, color:"var(--muted)"}}>{p.land}</div>
+                  </div>
+                  <div className="cond" style={{fontSize:15, fontWeight:800, color:ratingColor(p.rating)}}>{p.rating}</div>
+                </>
+              ) : (
+                <div style={{flex:1, fontSize:12, color:"var(--muted)", fontStyle:"italic"}}>—</div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// SCREEN: SQUAD OVERVIEW (na draft)
+// ═══════════════════════════════════════════════════════════════════
+function SquadOverview({ gevuld, slots, formation, onContinue }) {
+  const sterkte = useMemo(() => {
+    const players = gevuld.map(p => [p.naam, p.posities, p.rating, p.slotPos]);
+    return berekenSterkte(null, players);
+  }, [gevuld]);
+  const avgRating = (gevuld.reduce((a,p)=>a+p.rating,0)/gevuld.length);
+
+  return (
+    <div style={{maxWidth:820, margin:"0 auto", padding:"40px 20px 60px", animation:"fadeUp 0.5s ease"}}>
+      <div className="mono" style={{color:"var(--grass)", fontSize:12, fontWeight:700, letterSpacing:"0.3em", marginBottom:10}}>JOUW SELECTIE COMPLEET</div>
+      <div style={{display:"flex", justifyContent:"space-between", alignItems:"flex-end", flexWrap:"wrap", gap:16, marginBottom:28}}>
+        <h2 className="cond" style={{fontSize:44, fontWeight:900, color:"var(--white)"}}>{formation}</h2>
+        <div style={{display:"flex", gap:20}}>
+          <StatBlock label="AANVAL" value={sterkte.attack.toFixed(1)} color="var(--grass)"/>
+          <StatBlock label="MIDDEN" value={sterkte.mid.toFixed(1)} color="#5DD9C1"/>
+          <StatBlock label="DEFENSIE" value={sterkte.defense.toFixed(1)} color="var(--gold)"/>
+          <StatBlock label="TEAM" value={avgRating.toFixed(1)} color="var(--white)" big/>
+        </div>
+      </div>
+
+      <div style={{background:"linear-gradient(180deg, #0C3D22, #072415)", borderRadius:16, padding:"28px 20px", border:"1px solid rgba(0,212,106,0.2)", marginBottom:28}}>
+        <PitchView gevuld={gevuld} slots={slots} formation={formation}/>
+      </div>
+
+      <div style={{textAlign:"center"}}>
+        <Btn onClick={()=>onContinue(gevuld, sterkte, avgRating)}>Naar de groepsfase →</Btn>
+      </div>
+    </div>
+  );
+}
+
+function StatBlock({ label, value, color, big }) {
+  return (
+    <div style={{textAlign:"center"}}>
+      <div className="mono" style={{fontSize:10, color:"var(--muted)", letterSpacing:"0.15em", fontWeight:700, marginBottom:3}}>{label}</div>
+      <div className="cond" style={{fontSize: big?38:30, fontWeight:900, color, lineHeight:1}}>{value}</div>
+    </div>
+  );
+}
+
+function PitchView({ gevuld, slots, formation }) {
+  const rows = { GK:[], DEF:[], MID:[], ATT:[] };
+  slots.forEach((s,i) => {
+    const p = gevuld[i];
+    const entry = { ...p, slot:s.pos };
+    if (s.pos==="GK") rows.GK.push(entry);
+    else if (DEFENSE_POS.has(s.pos)) rows.DEF.push(entry);
+    else if (ATTACK_POS.has(s.pos)) rows.ATT.push(entry);
+    else rows.MID.push(entry);
+  });
+  const rowOrder = ["ATT","MID","DEF","GK"];
+  return (
+    <div style={{display:"flex", flexDirection:"column", gap:22}}>
+      {rowOrder.map(rk => (
+        <div key={rk} style={{display:"flex", justifyContent:"space-around", gap:10, flexWrap:"wrap"}}>
+          {rows[rk].map((p,i)=>(
+            <PitchPlayer key={i} p={p} delay={i*0.05}/>
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function PitchPlayer({ p, delay }) {
+  return (
+    <div style={{display:"flex", flexDirection:"column", alignItems:"center", gap:5, minWidth:76, maxWidth:110, animation:`popIn 0.4s ease ${delay}s both`}}>
+      <div style={{position:"relative"}}>
+        <div className="cond" style={{width:48, height:48, borderRadius:"50%",
+          background: p.rating>=88?"var(--gold)":p.rating>=83?"var(--grass)":"var(--panel2)",
+          border:`2px solid ${p.rating>=88?"var(--gold)":p.rating>=83?"var(--grass)":"var(--line)"}`,
+          display:"flex", alignItems:"center", justifyContent:"center",
+          fontSize:20, fontWeight:900, color: p.rating>=83?"#03260F":"var(--white)"}}>{p.rating}</div>
+        <div className="mono" style={{position:"absolute", top:-6, right:-8, fontSize:9, fontWeight:700,
+          background:"var(--bg)", color:"var(--muted)", padding:"1px 4px", borderRadius:4, border:"1px solid var(--line)"}}>{p.slot}</div>
+      </div>
+      <div style={{fontSize:11, fontWeight:600, color:"var(--white)", textAlign:"center", lineHeight:1.15,
+        whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", maxWidth:"100%"}}>{p.naam.split(' ').slice(-1)[0]}</div>
+      <Flag team={p.land} size={14}/>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// LIVE MATCH (klok-animatie met doelpunten)
+// ═══════════════════════════════════════════════════════════════════
+function LiveMatch({ homeNaam, awayNaam, gA, gB, scorersA, scorersB, extra, penaltyResult, onDone }) {
+  // Bouw één tijdlijn van alle doelpunten, gesorteerd op minuut.
+  const doelpunten = useMemo(() => {
+    const lijst = [];
+    (scorersA||[]).forEach(s => lijst.push({ ...s, kant:"a" }));
+    (scorersB||[]).forEach(s => lijst.push({ ...s, kant:"b" }));
+    lijst.sort((x,y)=>x.min-y.min);
+    return lijst;
+  }, [scorersA, scorersB]);
+
+  const eindMinuut = (extra==="nv" || extra==="pen") ? 120 : 90;
+  const DUUR_MS = eindMinuut > 90 ? 13000 : 10000; // iets langer bij verlenging
+
+  const [minuut, setMinuut] = useState(0);
+  const [klaar, setKlaar] = useState(false);
+  const [flits, setFlits] = useState(null); // doelpunt dat net gescoord is (pop-up)
+  const rafRef = useRef(null);
+  const startRef = useRef(null);
+  const skipRef = useRef(false);
+  const flitsTimer = useRef(null);
+
+  // Score t/m de huidige minuut.
+  const scoreA = doelpunten.filter(d=>d.kant==="a" && d.min<=minuut).length;
+  const scoreB = doelpunten.filter(d=>d.kant==="b" && d.min<=minuut).length;
+
+  useEffect(() => {
+    function tick(ts) {
+      if (skipRef.current) return;
+      if (!startRef.current) startRef.current = ts;
+      const verstreken = ts - startRef.current;
+      const m = Math.min(eindMinuut, Math.floor((verstreken / DUUR_MS) * eindMinuut));
+      setMinuut(prev => {
+        // Doelpunt-pop-up tonen als we net een doelpuntminuut passeren.
+        if (m > prev) {
+          const netGescoord = doelpunten.filter(d => d.min > prev && d.min <= m);
+          if (netGescoord.length) {
+            const laatste = netGescoord[netGescoord.length-1];
+            setFlits(laatste);
+            if (flitsTimer.current) clearTimeout(flitsTimer.current);
+            flitsTimer.current = setTimeout(()=>setFlits(null), 1600);
+          }
+        }
+        return m;
+      });
+      if (m >= eindMinuut) { setKlaar(true); return; }
+      rafRef.current = requestAnimationFrame(tick);
+    }
+    rafRef.current = requestAnimationFrame(tick);
+    return () => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      if (flitsTimer.current) clearTimeout(flitsTimer.current);
+    };
+  }, []);
+
+  function skip() {
+    skipRef.current = true;
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    if (flitsTimer.current) clearTimeout(flitsTimer.current);
+    setFlits(null);
+    setMinuut(eindMinuut);
+    setKlaar(true);
+  }
+
+  const homeLabel = homeNaam==="Jij" ? "JIJ" : homeNaam;
+  const awayLabel = awayNaam==="Jij" ? "JIJ" : awayNaam;
+  const inVerlenging = minuut > 90;
+
+  return (
+    <div style={{background:"var(--panel)", border:"1.5px solid var(--grass)", borderRadius:16, padding:"22px 20px", marginBottom:16, animation:"popIn 0.4s ease"}}>
+      {/* Klok */}
+      <div style={{textAlign:"center", marginBottom:14}}>
+        <div className="mono" style={{fontSize:11, fontWeight:700, letterSpacing:"0.2em",
+          color: inVerlenging ? "var(--gold)" : "var(--grass)"}}>
+          {klaar ? "EINDE" : inVerlenging ? "VERLENGING" : "LIVE"}
+        </div>
+        <div className="cond" style={{fontSize:52, fontWeight:900, color:"var(--white)", lineHeight:1, letterSpacing:"-0.02em"}}>
+          {minuut}<span style={{fontSize:26, color:"var(--muted)"}}>'</span>
+        </div>
+      </div>
+
+      {/* Voortgangsbalk */}
+      <div style={{height:4, background:"var(--bg)", borderRadius:2, overflow:"hidden", marginBottom:18}}>
+        <div style={{height:"100%", width:`${(minuut/eindMinuut)*100}%`,
+          background: inVerlenging ? "var(--gold)" : "var(--grass)", borderRadius:2, transition:"width 0.1s linear"}}/>
+      </div>
+
+      {/* Teams + live score */}
+      <div style={{display:"flex", alignItems:"center", justifyContent:"center", gap:16}}>
+        <div style={{flex:1, display:"flex", alignItems:"center", justifyContent:"flex-end", gap:10, textAlign:"right"}}>
+          <div className="cond" style={{fontSize:22, fontWeight:800, color:"var(--white)"}}>{homeLabel}</div>
+          <Flag team={homeNaam==="Jij"?"You FC":homeNaam} size={32}/>
+        </div>
+        <div style={{display:"flex", alignItems:"center", gap:10, minWidth:96, justifyContent:"center"}}>
+          <span className="cond" style={{fontSize:40, fontWeight:900, color:"var(--white)"}}>{scoreA}</span>
+          <span className="cond" style={{fontSize:22, color:"var(--muted)"}}>–</span>
+          <span className="cond" style={{fontSize:40, fontWeight:900, color:"var(--white)"}}>{scoreB}</span>
+        </div>
+        <div style={{flex:1, display:"flex", alignItems:"center", gap:10}}>
+          <Flag team={awayNaam==="Jij"?"You FC":awayNaam} size={32}/>
+          <div className="cond" style={{fontSize:22, fontWeight:800, color:"var(--white)"}}>{awayLabel}</div>
+        </div>
+      </div>
+
+      {/* Doelpunt pop-up */}
+      <div style={{minHeight:52, marginTop:14, display:"flex", alignItems:"center", justifyContent:"center"}}>
+        {flits ? (
+          <div key={flits.naam+flits.min} style={{display:"flex", alignItems:"center", gap:10, padding:"8px 18px",
+            background:"var(--grass)", color:"#03260F", borderRadius:10, fontWeight:800, animation:"popIn 0.35s ease"}}>
+            <span style={{fontSize:20}}>⚽</span>
+            <span className="cond" style={{fontSize:19}}>{flits.naam}</span>
+            <span className="mono" style={{fontSize:14, opacity:0.75}}>{flits.min}'</span>
+          </div>
+        ) : (
+          !klaar && <div className="mono" style={{fontSize:11, color:"var(--muted)", letterSpacing:"0.15em"}}>
+            {doelpunten.length===0 ? "NOG GEEN DOELPUNTEN" : ""}
+          </div>
+        )}
+      </div>
+
+      {/* Knop */}
+      <div style={{textAlign:"center", marginTop:8}}>
+        {klaar ? (
+          <Btn onClick={onDone}>Verder →</Btn>
+        ) : (
+          <button onClick={skip} className="cond" style={{background:"transparent", border:"1.5px solid var(--line)",
+            color:"var(--muted)", padding:"8px 20px", borderRadius:8, cursor:"pointer", fontSize:14, fontWeight:700,
+            textTransform:"uppercase", letterSpacing:"0.05em"}}>
+            ⏭ Naar einde
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// SCORECARD (signature component)
+// ═══════════════════════════════════════════════════════════════════
+function ScoreCard({ homeNaam, awayNaam, gA, gB, scorersA, scorersB, extra, isOurs, highlight, penaltyResult }) {
+  const homeWin = gA > gB;
+  const gelijk = gA === gB;  // gelijkspel (alleen in de groepsfase)
+  const randKleur = gelijk ? "var(--gold)" : (homeWin ? "var(--grass)" : "var(--red)");
+  return (
+    <div style={{animation:"popIn 0.4s ease", background: isOurs?"var(--panel)":"var(--bg2)",
+      border:`1.5px solid ${highlight ? randKleur : "var(--line)"}`,
+      borderRadius:12, overflow:"hidden", marginBottom:10}}>
+      <div style={{display:"flex", alignItems:"stretch"}}>
+        {/* Home */}
+        <div style={{flex:1, display:"flex", alignItems:"center", gap:10, padding:"14px 16px", justifyContent:"flex-end", textAlign:"right"}}>
+          <div>
+            <div className="cond" style={{fontSize:20, fontWeight:700, color: homeWin?"var(--white)":"var(--text)", lineHeight:1}}>
+              {homeNaam === "Jij" ? "JIJ" : homeNaam}
+            </div>
+          </div>
+          <Flag team={homeNaam==="Jij"?"You FC":homeNaam} size={28}/>
+        </div>
+        {/* Score */}
+        <div style={{display:"flex", alignItems:"center", gap:10, padding:"0 18px", background:"var(--bg)", minWidth:110, justifyContent:"center"}}>
+          <span className="cond" style={{fontSize:34, fontWeight:900, color: (homeWin&&!gelijk)?"var(--grass)":"var(--white)"}}>{gA}</span>
+          <span className="cond" style={{fontSize:20, color:"var(--muted)", fontWeight:600}}>–</span>
+          <span className="cond" style={{fontSize:34, fontWeight:900, color: (!homeWin&&!gelijk)?"var(--grass)":"var(--white)"}}>{gB}</span>
+        </div>
+        {/* Away */}
+        <div style={{flex:1, display:"flex", alignItems:"center", gap:10, padding:"14px 16px"}}>
+          <Flag team={awayNaam==="Jij"?"You FC":awayNaam} size={28}/>
+          <div className="cond" style={{fontSize:20, fontWeight:700, color: (!homeWin&&!gelijk)?"var(--white)":"var(--text)", lineHeight:1}}>
+            {awayNaam === "Jij" ? "JIJ" : awayNaam}
+          </div>
+        </div>
+      </div>
+      {extra && (
+        <div className="mono" style={{textAlign:"center", fontSize:10, color:"var(--gold)", padding:"2px 0 6px", letterSpacing:"0.1em", fontWeight:700}}>
+          {extra==="nv" ? "NA VERLENGING" : extra==="pen" ? `NA STRAFSCHOPPEN ${penaltyResult||""}` : ""}
+        </div>
+      )}
+      {(scorersA?.length > 0 || scorersB?.length > 0) && (
+        <div style={{display:"flex", borderTop:"1px solid var(--line)", background:"rgba(0,0,0,0.15)"}}>
+          <div style={{flex:1, padding:"8px 16px", textAlign:"right"}}>
+            {scorersA?.map((s,i)=><ScorerLine key={i} s={s} align="right"/>)}
+          </div>
+          <div style={{width:1, background:"var(--line)"}}/>
+          <div style={{flex:1, padding:"8px 16px"}}>
+            {scorersB?.map((s,i)=><ScorerLine key={i} s={s} align="left"/>)}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ScorerLine({ s, align }) {
+  return (
+    <div style={{fontSize:12, color:"var(--text)", display:"flex", gap:6, justifyContent: align==="right"?"flex-end":"flex-start", alignItems:"center", marginBottom:2}}>
+      {align==="left" && <span style={{color:"var(--grass)"}}>⚽</span>}
+      <span style={{fontWeight:500}}>{s.naam}</span>
+      <span className="mono" style={{color:"var(--muted)", fontSize:10}}>{s.min}'</span>
+      {align==="right" && <span style={{color:"var(--grass)"}}>⚽</span>}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// SCREEN: GROUP STAGE
+// ═══════════════════════════════════════════════════════════════════
+function GroupStage({ onzeSpelers, onzeSterkte, onComplete }) {
+  const [poulegenoten] = useState(() => trekPoulegenoten());
+  const [phase, setPhase] = useState("intro"); // intro | results
+  const [data, setData] = useState(null);
+  const [matchIdx, setMatchIdx] = useState(0); // welke van onze wedstrijden nu live gespeeld wordt
+
+  function simuleer() {
+    const sterktesPoel = {};
+    poulegenoten.forEach(n => sterktesPoel[n] = berekenSterkte(n));
+    const stand = { "Wij": {pts:0,gd:0,gf:0} };
+    poulegenoten.forEach(n => stand[n] = {pts:0,gd:0,gf:0});
+    const onzeWedstrijden = [];
+    const spelersPeng = onzeSpelers.map(p => [p.naam, p.posities, p.rating]);
+
+    for (const teg of poulegenoten) {
+      const { gA, gB } = simuleerWedstrijd(onzeSterkte, sterktesPoel[teg]);
+      if (gA>gB) stand["Wij"].pts+=3; else if (gB>gA) stand[teg].pts+=3; else { stand["Wij"].pts++; stand[teg].pts++; }
+      stand["Wij"].gd+=gA-gB; stand[teg].gd+=gB-gA; stand["Wij"].gf+=gA; stand[teg].gf+=gB;
+      onzeWedstrijden.push({
+        teg, gA, gB,
+        scorersA: genereerScorers(gA, spelersPeng),
+        scorersB: genereerScorers(gB, SQUADS[teg].players),
+      });
+    }
+    // Onderlinge
+    for (let i=0;i<poulegenoten.length;i++){
+      for (let j=i+1;j<poulegenoten.length;j++){
+        const a=poulegenoten[i], b=poulegenoten[j];
+        const { gA, gB } = simuleerWedstrijd(sterktesPoel[a], sterktesPoel[b]);
+        if (gA>gB) stand[a].pts+=3; else if (gB>gA) stand[b].pts+=3; else { stand[a].pts++; stand[b].pts++; }
+        stand[a].gd+=gA-gB; stand[b].gd+=gB-gA; stand[a].gf+=gA; stand[b].gf+=gB;
+      }
+    }
+    const alle = ["Wij", ...poulegenoten];
+    const sterktesAll = {...sterktesPoel, "Wij": onzeSterkte};
+    const gerankt = alle.sort((x,y) =>
+      (stand[y].pts-stand[x].pts) || (stand[y].gd-stand[x].gd) || (stand[y].gf-stand[x].gf) || (sterktesAll[y].overall-sterktesAll[x].overall));
+    const onzePos = gerankt.indexOf("Wij") + 1;
+    const pts = stand["Wij"].pts, gd = stand["Wij"].gd;
+    const ourGoals = stand["Wij"].gf;
+
+    let gekwal = true, kans = null, doorAls3 = null;
+    if (onzePos <= 2) gekwal = true;
+    else if (onzePos === 3) { kans = kansNr3(pts, gd); doorAls3 = Math.random() < kans; gekwal = doorAls3; }
+    else gekwal = false;
+
+    setData({ onzeWedstrijden, stand, gerankt, onzePos, pts, gd, gekwal, kans, doorAls3, ourGoals });
+    setPhase("results");
+  }
+
+  if (phase === "intro") {
+    return (
+      <div style={{maxWidth:640, margin:"0 auto", padding:"48px 20px", animation:"fadeUp 0.5s ease"}}>
+        <div className="mono" style={{color:"var(--grass)", fontSize:12, fontWeight:700, letterSpacing:"0.3em", marginBottom:10}}>GROEPSFASE</div>
+        <h2 className="cond" style={{fontSize:40, fontWeight:900, color:"var(--white)", marginBottom:8}}>Jouw poule</h2>
+        <p style={{color:"var(--text)", marginBottom:28, fontSize:16}}>Je speelt tegen deze drie landen. Word 1e of 2e om zeker door te gaan — als 3e hangt het van je punten af.</p>
+        <div style={{display:"flex", flexDirection:"column", gap:10, marginBottom:32}}>
+          {poulegenoten.map((teg,i)=>(
+            <div key={teg} style={{display:"flex", alignItems:"center", gap:14, padding:"16px 18px",
+              background:"var(--panel)", border:"1px solid var(--line)", borderRadius:12, animation:`slideInLeft 0.4s ease ${i*0.1}s both`}}>
+              <div className="mono" style={{fontSize:12, color:"var(--muted)", fontWeight:700}}>W{i+1}</div>
+              <Flag team={teg} size={32}/>
+              <div className="cond" style={{fontSize:24, fontWeight:700, color:"var(--white)", flex:1}}>{teg}</div>
+              <div className="cond" style={{fontSize:18, fontWeight:700, color:"var(--muted)"}}>{berekenSterkte(teg).overall.toFixed(0)}</div>
+            </div>
+          ))}
+        </div>
+        <div style={{textAlign:"center"}}><Btn onClick={simuleer}>Speel de wedstrijden</Btn></div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{maxWidth:720, margin:"0 auto", padding:"36px 20px 60px", animation:"fadeIn 0.4s ease"}}>
+      <div className="mono" style={{color:"var(--grass)", fontSize:12, fontWeight:700, letterSpacing:"0.3em", marginBottom:16}}>
+        {matchIdx < data.onzeWedstrijden.length ? `GROEPSFASE · WEDSTRIJD ${matchIdx+1} / ${data.onzeWedstrijden.length}` : "GROEPSFASE · UITSLAGEN"}
+      </div>
+
+      {/* Reeds gespeelde wedstrijden als scorecard */}
+      {data.onzeWedstrijden.slice(0, matchIdx).map((w,i)=>(
+        <ScoreCard key={i} homeNaam="Jij" awayNaam={w.teg} gA={w.gA} gB={w.gB}
+          scorersA={w.scorersA} scorersB={w.scorersB} isOurs highlight/>
+      ))}
+
+      {/* Huidige wedstrijd live */}
+      {matchIdx < data.onzeWedstrijden.length && (() => {
+        const w = data.onzeWedstrijden[matchIdx];
+        return (
+          <LiveMatch key={matchIdx} homeNaam="Jij" awayNaam={w.teg} gA={w.gA} gB={w.gB}
+            scorersA={w.scorersA} scorersB={w.scorersB}
+            onDone={()=>setMatchIdx(matchIdx+1)}/>
+        );
+      })()}
+
+      {/* Standings + verdict pas na alle wedstrijden */}
+      {matchIdx >= data.onzeWedstrijden.length && (
+        <>
+          <div style={{background:"var(--bg2)", border:"1px solid var(--line)", borderRadius:12, padding:"18px", marginTop:20, marginBottom:24}}>
+            <div className="mono" style={{fontSize:11, color:"var(--muted)", letterSpacing:"0.2em", fontWeight:700, marginBottom:14}}>EINDSTAND</div>
+            {data.gerankt.map((team,i)=>{
+              const s = data.stand[team]; const isUs = team==="Wij";
+              return (
+                <div key={team} style={{display:"flex", alignItems:"center", gap:12, padding:"9px 8px",
+                  borderBottom: i<3?"1px solid var(--line)":"none",
+                  background: isUs?"rgba(0,212,106,0.08)":"transparent", borderRadius:6}}>
+                  <div className="cond" style={{fontSize:18, fontWeight:800, width:20, color: i<2?"var(--grass)":i===2?"var(--gold)":"var(--muted)"}}>{i+1}</div>
+                  <Flag team={isUs?"You FC":team} size={22}/>
+                  <div className="cond" style={{fontSize:18, fontWeight:700, flex:1, color: isUs?"var(--white)":"var(--text)"}}>{isUs?"JIJ":team}</div>
+                  <div className="mono" style={{fontSize:12, color:"var(--muted)"}}>{s.gd>=0?"+":""}{s.gd}</div>
+                  <div className="cond" style={{fontSize:20, fontWeight:800, color:"var(--white)", width:28, textAlign:"right"}}>{s.pts}</div>
+                </div>
+              );
+            })}
+          </div>
+
+          <QualVerdict data={data} onComplete={()=>onComplete(data.onzePos, data.gekwal, poulegenoten, data.ourGoals)}/>
+        </>
+      )}
+    </div>
+  );
+}
+
+function QualVerdict({ data, onComplete }) {
+  const { onzePos, gekwal, kans, pts, gd } = data;
+  let msg, sub, color;
+  if (onzePos <= 2) {
+    color = "var(--grass)";
+    msg = onzePos === 1 ? "Groepswinnaar" : "Door als runner-up";
+    sub = "Je bent geplaatst voor de knock-outfase.";
+  } else if (onzePos === 3 && gekwal) {
+    color = "var(--grass)";
+    msg = "Door als beste nr. 3";
+    sub = `Met ${pts} punten (saldo ${gd>=0?"+":""}${gd}) — kans was ${Math.round(kans*100)}%.`;
+  } else if (onzePos === 3) {
+    color = "var(--red)";
+    msg = "Uitgeschakeld";
+    sub = `Als 3e met ${pts} punten net niet genoeg — kans was ${Math.round(kans*100)}%.`;
+  } else {
+    color = "var(--red)";
+    msg = "Uitgeschakeld";
+    sub = "Als 4e lig je eruit.";
+  }
+  return (
+    <div style={{textAlign:"center", padding:"24px", background:"var(--panel)", borderRadius:14, border:`1.5px solid ${color}`, animation:"popIn 0.5s ease"}}>
+      <div className="cond" style={{fontSize:34, fontWeight:900, color, marginBottom:6}}>{msg}</div>
+      <div style={{color:"var(--text)", fontSize:15, marginBottom:20}}>{sub}</div>
+      <Btn onClick={onComplete} variant={gekwal?"primary":"ghost"}>
+        {gekwal ? "Naar de knock-out →" : "Bekijk eindresultaat"}
+      </Btn>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// SCREEN: KNOCKOUT
+// ═══════════════════════════════════════════════════════════════════
+function Knockout({ onzeSpelers, onzeSterkte, onzePos, poulegenoten, onFinish, addGoals }) {
+  const [bracket] = useState(() => bouwBracket(onzePos, poulegenoten));
+  const [teams, setTeams] = useState(() => {
+    let t = bracket.map(([team]) => team);
+    while (t.length % 2 !== 0) t.push("Bye");
+    if (!t.includes("Wij")) t[0] = "Wij";
+    return t;
+  });
+  const [rondeNr, setRondeNr] = useState(0);
+  const [wijDoor, setWijDoor] = useState(true);
+  const [phase, setPhase] = useState("matchups"); // matchups | penalties | results
+  const [paren, setParen] = useState(null);
+  const [rondeResults, setRondeResults] = useState(null);
+  const [pendingPenalty, setPendingPenalty] = useState(null);
+  const [uitschakelRonde, setUitschakelRonde] = useState(null);
+  const [liveKlaar, setLiveKlaar] = useState(false); // is de live-animatie van onze wedstrijd afgelopen?
+  const spelersPeng = useMemo(() => onzeSpelers.map(p => [p.naam, p.posities, p.rating]), [onzeSpelers]);
+
+  function sterkteVan(t) {
+    if (t === "Wij") return onzeSterkte;
+    return SQUADS[t] ? berekenSterkte(t) : berekenSterkte("Qatar");
+  }
+
+  function maakParen() {
+    let p;
+    if (wijDoor) {
+      const nietWij = teams.filter(t => t !== "Wij");
+      for (let i=nietWij.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [nietWij[i],nietWij[j]]=[nietWij[j],nietWij[i]]; }
+      p = [["Wij", nietWij[0]]];
+      for (let i=1;i<nietWij.length;i+=2) p.push([nietWij[i], nietWij[i+1] ?? "Bye"]);
+    } else {
+      const shuf = [...teams];
+      for (let i=shuf.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [shuf[i],shuf[j]]=[shuf[j],shuf[i]]; }
+      p = [];
+      for (let i=0;i<shuf.length;i+=2) p.push([shuf[i], shuf[i+1] ?? "Bye"]);
+    }
+    setParen(p);
+    setPhase("matchups");
+  }
+
+  useEffect(() => { maakParen(); }, [rondeNr]);
+
+  function speelRonde() {
+    // Simulate all pairs. If our match ends in penalties, pause for shootout.
+    const results = [];
+    let ourPenalty = null;
+    let nieuwDoor = wijDoor;
+    let uitRonde = uitschakelRonde;
+
+    for (const [a,b] of paren) {
+      if (b === "Bye") { results.push({ a, b, bye:true, winnaar:a }); continue; }
+      const isOurs = (a==="Wij" || b==="Wij");
+      const { gA, gB, extra, etA, etB } = simuleerWedstrijd(sterkteVan(a), sterkteVan(b), true);
+      let winnaar, penData = null;
+
+      if (extra === "pen") {
+        // Penalty shootout
+        const teg = a==="Wij" ? b : a;
+        const spA = a==="Wij" ? spelersPeng : (SQUADS[a]?.players || []);
+        const spB = b==="Wij" ? spelersPeng : (SQUADS[b]?.players || []);
+        const pen = simuleerStrafschoppen(sterkteVan(a), sterkteVan(b), spA, spB);
+        winnaar = pen.aWint ? a : b;
+        penData = pen;
+        if (isOurs) {
+          // Store to show shootout screen
+          ourPenalty = { a, b, gA, gB, pen, teg };
+        }
+      } else {
+        winnaar = gA > gB ? a : b;
+      }
+
+      const scorersA = isOurs && a==="Wij" ? genereerScorers(gA, spelersPeng, etA) : (SQUADS[a] ? genereerScorers(gA, SQUADS[a].players, etA) : []);
+      const scorersB = isOurs && b==="Wij" ? genereerScorers(gB, spelersPeng, etB) : (SQUADS[b] ? genereerScorers(gB, SQUADS[b].players, etB) : []);
+
+      results.push({ a, b, gA, gB, extra, winnaar, penData, isOurs, scorersA, scorersB });
+
+      if (isOurs) {
+        addGoals(a==="Wij" ? gA : gB);
+        if (winnaar !== "Wij") { nieuwDoor = false; uitRonde = RONDES[rondeNr]; }
+      }
+    }
+
+    if (ourPenalty) {
+      // Show penalty screen first, then reveal results
+      setPendingPenalty({ penalty: ourPenalty, results, nieuwDoor, uitRonde });
+      setPhase("penalties");
+    } else {
+      finishRonde(results, nieuwDoor, uitRonde);
+    }
+  }
+
+  function finishRonde(results, nieuwDoor, uitRonde) {
+    setRondeResults(results);
+    setWijDoor(nieuwDoor);
+    if (uitRonde && !uitschakelRonde) setUitschakelRonde(uitRonde);
+    // Bij een strafschoppen-wedstrijd is de shootout al getoond → geen live-klok meer.
+    const ourResult = results.find(r => r.isOurs);
+    setLiveKlaar(ourResult && ourResult.extra === "pen" ? true : false);
+    setPhase("results");
+  }
+
+  function afterPenalty() {
+    const { results, nieuwDoor, uitRonde } = pendingPenalty;
+    setPendingPenalty(null);
+    finishRonde(results, nieuwDoor, uitRonde);
+  }
+
+  function volgendeRonde() {
+    const winnaars = rondeResults.map(r => r.winnaar);
+    if (winnaars.length === 1) {
+      // Tournament over
+      onFinish(winnaars[0], uitschakelRonde);
+      return;
+    }
+    setTeams(winnaars);
+    setRondeResults(null);
+    setRondeNr(rondeNr + 1);
+  }
+
+  const rondeNaam = RONDES[rondeNr] || `Ronde ${rondeNr+1}`;
+
+  // PENALTY SHOOTOUT SCREEN
+  if (phase === "penalties" && pendingPenalty) {
+    return <PenaltyShootout data={pendingPenalty.penalty} onDone={afterPenalty}/>;
+  }
+
+  // MATCHUPS SCREEN
+  if (phase === "matchups" && paren) {
+    const ourMatch = paren.find(([a,b]) => a==="Wij" || b==="Wij");
+    const ourTeg = ourMatch ? (ourMatch[0]==="Wij" ? ourMatch[1] : ourMatch[0]) : null;
+    return (
+      <div style={{maxWidth:720, margin:"0 auto", padding:"36px 20px 60px", animation:"fadeUp 0.5s ease"}}>
+        <div className="mono" style={{color:"var(--grass)", fontSize:12, fontWeight:700, letterSpacing:"0.3em", marginBottom:8}}>KNOCK-OUT</div>
+        <h2 className="cond" style={{fontSize:40, fontWeight:900, color:"var(--white)", marginBottom:6}}>{rondeNaam}</h2>
+        {wijDoor && ourTeg ? (
+          <div style={{margin:"24px 0", padding:"28px 20px", background:"var(--panel)", borderRadius:16, border:"1.5px solid var(--grass)", textAlign:"center", animation:"popIn 0.5s ease"}}>
+            <div className="mono" style={{fontSize:11, color:"var(--muted)", letterSpacing:"0.2em", fontWeight:700, marginBottom:16}}>JOUW WEDSTRIJD</div>
+            <div style={{display:"flex", alignItems:"center", justifyContent:"center", gap:24}}>
+              <div style={{textAlign:"center"}}>
+                <Flag team="You FC" size={52}/>
+                <div className="cond" style={{fontSize:26, fontWeight:800, color:"var(--white)", marginTop:8}}>JIJ</div>
+              </div>
+              <div className="cond" style={{fontSize:28, fontWeight:700, color:"var(--muted)"}}>VS</div>
+              <div style={{textAlign:"center"}}>
+                <Flag team={ourTeg} size={52}/>
+                <div className="cond" style={{fontSize:26, fontWeight:800, color:"var(--white)", marginTop:8}}>{ourTeg}</div>
+                <div className="mono" style={{fontSize:12, color:"var(--muted)", marginTop:2}}>OVR {berekenSterkte(ourTeg).overall.toFixed(0)}</div>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div style={{margin:"24px 0", padding:"20px", background:"var(--panel)", borderRadius:12, border:"1px solid var(--line)", textAlign:"center"}}>
+            <div style={{color:"var(--text)"}}>Je bent uitgeschakeld — bekijk hoe de rest van het toernooi verloopt.</div>
+          </div>
+        )}
+        {/* Other matchups preview */}
+        <div style={{marginTop:20}}>
+          <div className="mono" style={{fontSize:11, color:"var(--muted)", letterSpacing:"0.2em", fontWeight:700, marginBottom:12}}>
+            {rondeNaam.toUpperCase()} — ALLE WEDSTRIJDEN
+          </div>
+          <div style={{display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(300px, 1fr))", gap:8}}>
+            {paren.filter(([a,b])=>b!=="Bye").map(([a,b],i)=>{
+              const isOurs = a==="Wij"||b==="Wij";
+              return (
+                <div key={i} style={{display:"flex", alignItems:"center", gap:8, padding:"10px 12px",
+                  background: isOurs?"rgba(0,212,106,0.08)":"var(--bg2)", border:`1px solid ${isOurs?"var(--grass)":"var(--line)"}`, borderRadius:8}}>
+                  <div style={{flex:1, display:"flex", alignItems:"center", justifyContent:"flex-end", gap:8}}>
+                    <div className="cond" style={{fontSize:15, fontWeight:700, color:"var(--text)", textAlign:"right"}}>{a==="Wij"?"JIJ":a}</div>
+                    <Flag team={a==="Wij"?"You FC":a} size={20}/>
+                  </div>
+                  <div className="mono" style={{fontSize:10, color:"var(--muted)"}}>vs</div>
+                  <div style={{flex:1, display:"flex", alignItems:"center", gap:8}}>
+                    <Flag team={b==="Wij"?"You FC":b} size={20}/>
+                    <div className="cond" style={{fontSize:15, fontWeight:700, color:"var(--text)"}}>{b==="Wij"?"JIJ":b}</div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+        <div style={{textAlign:"center", marginTop:28}}>
+          <Btn onClick={speelRonde}>Speel {rondeNaam.toLowerCase()}</Btn>
+        </div>
+      </div>
+    );
+  }
+
+  // RESULTS SCREEN
+  if (phase === "results" && rondeResults) {
+    const ourResult = rondeResults.find(r => r.isOurs);
+
+    // Live-animatie van onze wedstrijd eerst (behalve bij strafschoppen).
+    if (ourResult && !liveKlaar) {
+      return (
+        <div style={{maxWidth:720, margin:"0 auto", padding:"36px 20px 60px", animation:"fadeIn 0.4s ease"}}>
+          <div className="mono" style={{color:"var(--grass)", fontSize:12, fontWeight:700, letterSpacing:"0.3em", marginBottom:16}}>{rondeNaam.toUpperCase()}</div>
+          <LiveMatch homeNaam={ourResult.a==="Wij"?"Jij":ourResult.a} awayNaam={ourResult.b==="Wij"?"Jij":ourResult.b}
+            gA={ourResult.gA} gB={ourResult.gB} extra={ourResult.extra}
+            scorersA={ourResult.scorersA} scorersB={ourResult.scorersB}
+            onDone={()=>setLiveKlaar(true)}/>
+        </div>
+      );
+    }
+
+    return (
+      <div style={{maxWidth:720, margin:"0 auto", padding:"36px 20px 60px", animation:"fadeIn 0.4s ease"}}>
+        <div className="mono" style={{color:"var(--grass)", fontSize:12, fontWeight:700, letterSpacing:"0.3em", marginBottom:8}}>{rondeNaam.toUpperCase()} · UITSLAGEN</div>
+        {ourResult && (
+          <div style={{marginBottom:20}}>
+            <ScoreCard homeNaam={ourResult.a==="Wij"?"Jij":ourResult.a} awayNaam={ourResult.b==="Wij"?"Jij":ourResult.b}
+              gA={ourResult.gA} gB={ourResult.gB} extra={ourResult.extra}
+              penaltyResult={ourResult.penData ? `${ourResult.penData.scoreA}-${ourResult.penData.scoreB}` : ""}
+              scorersA={ourResult.scorersA} scorersB={ourResult.scorersB} isOurs highlight/>
+          </div>
+        )}
+        <div className="mono" style={{fontSize:11, color:"var(--muted)", letterSpacing:"0.2em", fontWeight:700, marginBottom:10}}>OVERIGE UITSLAGEN</div>
+        {rondeResults.filter(r=>!r.isOurs && !r.bye).map((r,i)=>(
+          <div key={i} style={{display:"flex", alignItems:"center", gap:10, padding:"9px 14px", background:"var(--bg2)", border:"1px solid var(--line)", borderRadius:8, marginBottom:6}}>
+            <div style={{flex:1, display:"flex", alignItems:"center", justifyContent:"flex-end", gap:8}}>
+              <div className="cond" style={{fontSize:15, fontWeight:600, color: r.winnaar===r.a?"var(--white)":"var(--muted)", textAlign:"right"}}>{r.a==="Wij"?"JIJ":r.a}</div>
+              <Flag team={r.a==="Wij"?"You FC":r.a} size={22}/>
+            </div>
+            <div className="cond mono" style={{fontSize:15, fontWeight:800, color:"var(--white)", minWidth:44, textAlign:"center"}}>
+              {r.gA}-{r.gB}{r.extra==="pen"?"*":""}
+            </div>
+            <div style={{flex:1, display:"flex", alignItems:"center", gap:8}}>
+              <Flag team={r.b==="Wij"?"You FC":r.b} size={22}/>
+              <div className="cond" style={{fontSize:15, fontWeight:600, color: r.winnaar===r.b?"var(--white)":"var(--muted)"}}>{r.b==="Wij"?"JIJ":r.b}</div>
+            </div>
+          </div>
+        ))}
+        <div style={{textAlign:"center", marginTop:28}}>
+          <Btn onClick={volgendeRonde}>
+            {rondeResults.map(r=>r.winnaar).length === 1 ? "Bekijk eindresultaat →" : `Naar ${(RONDES[rondeNr+1]||"volgende ronde").toLowerCase()} →`}
+          </Btn>
+        </div>
+      </div>
+    );
+  }
+
+  return <div style={{padding:40, textAlign:"center", color:"var(--muted)"}}>Laden...</div>;
+}
+
+// PENALTY SHOOTOUT
+function PenaltyShootout({ data, onDone }) {
+  const { a, b, pen, teg } = data;
+  const [revealed, setRevealed] = useState(0);
+  const homeNaam = a==="Wij" ? "JIJ" : a;
+  const awayNaam = b==="Wij" ? "JIJ" : b;
+
+  useEffect(() => {
+    if (revealed < pen.shots.length) {
+      const t = setTimeout(() => setRevealed(revealed+1), 850);
+      return () => clearTimeout(t);
+    }
+  }, [revealed, pen.shots.length]);
+
+  const done = revealed >= pen.shots.length;
+
+  return (
+    <div style={{maxWidth:560, margin:"0 auto", padding:"40px 20px 60px", animation:"fadeIn 0.4s ease"}}>
+      <div style={{textAlign:"center", marginBottom:24}}>
+        <div className="mono" style={{color:"var(--gold)", fontSize:12, fontWeight:700, letterSpacing:"0.3em", marginBottom:8, animation:"pulse 1.5s infinite"}}>STRAFSCHOPPEN</div>
+        <div style={{display:"flex", alignItems:"center", justifyContent:"center", gap:20}}>
+          <div className="cond" style={{fontSize:24, fontWeight:800, color:"var(--white)"}}>{homeNaam}</div>
+          <div style={{display:"flex", gap:8, alignItems:"center"}}>
+            <span className="cond" style={{fontSize:44, fontWeight:900, color:"var(--grass)"}}>{done?pen.scoreA:"–"}</span>
+            <span className="cond" style={{fontSize:24, color:"var(--muted)"}}>:</span>
+            <span className="cond" style={{fontSize:44, fontWeight:900, color:"var(--grass)"}}>{done?pen.scoreB:"–"}</span>
+          </div>
+          <div className="cond" style={{fontSize:24, fontWeight:800, color:"var(--white)"}}>{awayNaam}</div>
+        </div>
+      </div>
+
+      <div style={{background:"var(--panel)", border:"1px solid var(--line)", borderRadius:14, overflow:"hidden"}}>
+        <div style={{display:"flex", padding:"10px 16px", borderBottom:"1px solid var(--line)", background:"var(--bg2)"}}>
+          <div className="cond" style={{flex:1, fontSize:15, fontWeight:700, color:"var(--text)", textAlign:"right"}}>{homeNaam}</div>
+          <div style={{width:60}}/>
+          <div className="cond" style={{flex:1, fontSize:15, fontWeight:700, color:"var(--text)"}}>{awayNaam}</div>
+        </div>
+        {pen.shots.slice(0, revealed).map((shot,i)=>(
+          <div key={i} style={{display:"flex", alignItems:"center", padding:"10px 16px",
+            borderBottom: i<revealed-1?"1px solid var(--line)":"none", animation:"slideInLeft 0.3s ease"}}>
+            <div style={{flex:1, display:"flex", alignItems:"center", justifyContent:"flex-end", gap:8}}>
+              <span style={{fontSize:12, color:"var(--text)", fontWeight:500}}>{shot.a.naam}</span>
+              <span style={{fontSize:18}}>{shot.a.goal ? "⚽" : "❌"}</span>
+            </div>
+            <div className="mono" style={{width:60, textAlign:"center", fontSize:11, fontWeight:700, color: shot.sd?"var(--gold)":"var(--muted)"}}>
+              {shot.sd ? `SD${shot.round}` : shot.round}
+            </div>
+            <div style={{flex:1, display:"flex", alignItems:"center", gap:8}}>
+              <span style={{fontSize:18}}>{shot.b.goal ? "⚽" : "❌"}</span>
+              <span style={{fontSize:12, color:"var(--text)", fontWeight:500}}>{shot.b.naam}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {done && (
+        <div style={{textAlign:"center", marginTop:24, animation:"popIn 0.5s ease"}}>
+          <div className="cond" style={{fontSize:26, fontWeight:900, color: pen.aWint===(a==="Wij")?"var(--grass)":"var(--red)", marginBottom:16}}>
+            {(pen.aWint ? homeNaam : awayNaam)} wint de strafschoppenreeks
+          </div>
+          <Btn onClick={onDone}>Verder</Btn>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// SCREEN: FINISH (champion or eliminated)
+// ═══════════════════════════════════════════════════════════════════
+function FinishScreen({ kampioen, uitschakelRonde, teamRating, goals, onScoreboard, onReplay }) {
+  const isChamp = kampioen === "Wij";
+  return (
+    <div style={{minHeight:"100vh", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", padding:"40px 20px", position:"relative", overflow:"hidden"}}>
+      {isChamp && <Confetti/>}
+      <div style={{textAlign:"center", zIndex:2, animation:"fadeUp 0.6s ease", maxWidth:520}}>
+        {isChamp ? (
+          <>
+            <div style={{fontSize:96, marginBottom:12, animation:"trophySpin 1s ease"}}>🏆</div>
+            <div className="mono" style={{color:"var(--gold)", fontSize:14, fontWeight:700, letterSpacing:"0.3em", marginBottom:12}}>WERELDKAMPIOEN 2026</div>
+            <h1 className="cond" style={{fontSize:"clamp(44px, 10vw, 76px)", fontWeight:900, color:"var(--white)", lineHeight:0.9, marginBottom:16}}>
+              JE HEBT DE<br/><span style={{color:"var(--gold)"}}>WERELDBEKER</span><br/>GEWONNEN
+            </h1>
+          </>
+        ) : (
+          <>
+            <div style={{fontSize:72, marginBottom:16}}>😞</div>
+            <div className="mono" style={{color:"var(--red)", fontSize:14, fontWeight:700, letterSpacing:"0.3em", marginBottom:12}}>UITGESCHAKELD</div>
+            <h1 className="cond" style={{fontSize:"clamp(36px, 8vw, 60px)", fontWeight:900, color:"var(--white)", lineHeight:0.95, marginBottom:12}}>
+              EINDE IN DE<br/><span style={{color:"var(--red)"}}>{(uitschakelRonde||"groepsfase").toUpperCase()}</span>
+            </h1>
+            <div style={{color:"var(--text)", fontSize:16, marginBottom:8}}>
+              Wereldkampioen: <strong style={{color:"var(--white)"}}>{kampioen==="Wij"?"Jij":kampioen}</strong>
+            </div>
+          </>
+        )}
+
+        <div style={{display:"flex", gap:24, justifyContent:"center", margin:"28px 0 36px"}}>
+          <StatBlock label="TEAMRATING" value={teamRating.toFixed(1)} color="var(--grass)" big/>
+          <StatBlock label="DOELPUNTEN" value={goals} color="var(--gold)" big/>
+        </div>
+
+        <div style={{display:"flex", gap:12, justifyContent:"center", flexWrap:"wrap"}}>
+          <Btn onClick={onReplay} variant={isChamp?"gold":"primary"}>Speel opnieuw</Btn>
+          <Btn onClick={onScoreboard} variant="ghost">Scorebord</Btn>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Confetti() {
+  const pieces = useMemo(() => Array.from({length:60}, (_,i) => ({
+    id:i, left: Math.random()*100, delay: Math.random()*2, dur: 2.5+Math.random()*2,
+    color: ["#FFB627","#00D46A","#F5F8FF","#FF3B5C","#5DD9C1"][Math.floor(Math.random()*5)],
+    size: 6+Math.random()*8,
+  })), []);
+  return (
+    <div style={{position:"absolute", inset:0, pointerEvents:"none", zIndex:1}}>
+      {pieces.map(p=>(
+        <div key={p.id} style={{position:"absolute", left:`${p.left}%`, top:0, width:p.size, height:p.size*0.6,
+          background:p.color, animation:`confetti ${p.dur}s linear ${p.delay}s infinite`, borderRadius:2}}/>
+      ))}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// SCREEN: SCOREBOARD
+// ═══════════════════════════════════════════════════════════════════
+function Scoreboard({ onBack }) {
+  const [players, setPlayers] = useState(null);
+  const [sortBy, setSortBy] = useState("championships");
+
+  useEffect(() => { loadScoreboard().then(setPlayers); }, []);
+
+  // Kolommen: sleutel, korte label, en waarde-functie per speler.
+  const KOLOMMEN = [
+    { key:"games",         label:"Aantal deelnames", kort:["AANTAL","DEELNAMES"], val:p => p.games || 0 },
+    { key:"championships", label:"Winsten",    kort:"🏆",     val:p => p.championships || 0 },
+    { key:"bestRating",    label:"Hoogste rating", kort:["HOOGSTE","RATING"], val:p => p.bestRating || 0 },
+    { key:"goals",         label:"Doelpunten", kort:"⚽",     val:p => p.goals || 0 },
+  ];
+  const valFn = k => (KOLOMMEN.find(c => c.key===k) || KOLOMMEN[0]).val;
+
+  const sorted = useMemo(() => {
+    if (!players) return [];
+    const norm = players.map(p => ({
+      ...p,
+      games: p.games || 0,
+      championships: p.championships || 0,
+      goals: p.goals || 0,
+      // Oudere opslag heeft geen bestRating; benader met gemiddelde als laatste redmiddel.
+      bestRating: p.bestRating || (p.games>0 ? p.totalRating/p.games : 0),
+    }));
+    const f = valFn(sortBy);
+    return norm.sort((a,b) => f(b) - f(a) || (b.championships-a.championships) || (b.bestRating-a.bestRating));
+  }, [players, sortBy]);
+
+  return (
+    <div style={{maxWidth:760, margin:"0 auto", padding:"40px 20px 60px", animation:"fadeUp 0.5s ease"}}>
+      <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8}}>
+        <div className="mono" style={{color:"var(--grass)", fontSize:12, fontWeight:700, letterSpacing:"0.3em"}}>WERELDRANGLIJST</div>
+        <button onClick={onBack} className="cond" style={{background:"none", border:"none", color:"var(--muted)", cursor:"pointer", fontSize:15, fontWeight:700}}>← TERUG</button>
+      </div>
+      <h2 className="cond" style={{fontSize:44, fontWeight:900, color:"var(--white)", marginBottom:8}}>Scorebord</h2>
+      <div style={{color:"var(--muted)", fontSize:13, marginBottom:20}}>Tik op een kolom om daarop te sorteren.</div>
+
+      {players === null ? (
+        <div style={{textAlign:"center", padding:40, color:"var(--muted)"}}>Laden...</div>
+      ) : sorted.length === 0 ? (
+        <div style={{textAlign:"center", padding:"48px 20px", background:"var(--panel)", borderRadius:14, border:"1px solid var(--line)"}}>
+          <div style={{fontSize:40, marginBottom:12}}>⚽</div>
+          <div className="cond" style={{fontSize:22, fontWeight:700, color:"var(--white)", marginBottom:6}}>Nog geen resultaten</div>
+          <div style={{color:"var(--text)", fontSize:15}}>Speel een toernooi om op het scorebord te komen.</div>
+        </div>
+      ) : (
+        <div style={{background:"var(--bg2)", border:"1px solid var(--line)", borderRadius:14, overflow:"hidden"}}>
+          {/* Header met klikbare kolommen */}
+          <div style={{display:"flex", padding:"12px 16px", borderBottom:"1px solid var(--line)", background:"var(--panel)", alignItems:"center"}}>
+            <div className="mono" style={{width:28, fontSize:10, color:"var(--muted)", fontWeight:700}}>#</div>
+            <div className="mono" style={{flex:1, fontSize:10, color:"var(--muted)", fontWeight:700, letterSpacing:"0.1em"}}>SPELER</div>
+            {KOLOMMEN.map(c=>{
+              const meerdere = Array.isArray(c.kort);
+              return (
+              <button key={c.key} onClick={()=>setSortBy(c.key)} title={c.label} className="mono" style={{
+                width: meerdere?66:56, fontSize:10, fontWeight:700, textAlign:"center", cursor:"pointer",
+                background:"none", border:"none", padding:"4px 0", letterSpacing:"0.02em", lineHeight:1.25,
+                color: sortBy===c.key ? "var(--grass)" : "var(--muted)",
+                borderBottom: sortBy===c.key ? "2px solid var(--grass)" : "2px solid transparent"}}>
+                {meerdere ? c.kort.map((w,wi)=><div key={wi}>{w}</div>) : c.kort}
+              </button>
+              );
+            })}
+          </div>
+          {sorted.map((p,i)=>(
+            <div key={i} style={{display:"flex", alignItems:"center", padding:"12px 16px",
+              borderBottom: i<sorted.length-1?"1px solid var(--line)":"none",
+              background: i===0 && p[sortBy]>0 ? "rgba(255,182,39,0.06)":"transparent"}}>
+              <div className="cond" style={{width:28, fontSize:18, fontWeight:800, color: i===0?"var(--gold)":i<3?"var(--grass)":"var(--muted)"}}>{i+1}</div>
+              <div style={{flex:1, minWidth:0}}>
+                <div className="cond" style={{fontSize:19, fontWeight:700, color:"var(--white)", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis"}}>{p.naam}</div>
+              </div>
+              <div className="cond" style={{width:66, fontSize:20, fontWeight:800, textAlign:"center",
+                color: sortBy==="games"?"var(--white)":"var(--text)"}}>{p.games}</div>
+              <div className="cond" style={{width:56, fontSize:20, fontWeight:900, textAlign:"center",
+                color: p.championships>0?"var(--gold)":"var(--muted)"}}>{p.championships}</div>
+              <div className="cond" style={{width:66, fontSize:20, fontWeight:800, textAlign:"center",
+                color: ratingColor(p.bestRating)}}>{p.bestRating>0 ? p.bestRating.toFixed(1) : "—"}</div>
+              <div className="cond" style={{width:56, fontSize:20, fontWeight:800, textAlign:"center",
+                color: sortBy==="goals"?"var(--white)":"var(--text)"}}>{p.goals}</div>
+            </div>
+          ))}
+        </div>
+      )}
+      <div className="mono" style={{textAlign:"center", marginTop:20, fontSize:11, color:"var(--muted)"}}>
+        {jsonbinKlaar()
+          ? "Gedeeld scorebord — resultaten van alle spelers van deze link."
+          : "Lokaal scorebord — alleen zichtbaar in deze browser. Stel JSONBin in om te delen."}
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// MAIN APP
+// ═══════════════════════════════════════════════════════════════════
+function App() {
+  const [screen, setScreen] = useState("start"); // start | formation | draft | overview | group | knockout | finish | scoreboard
+  const [naam, setNaam] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [formation, setFormation] = useState(null);
+  const [gevuld, setGevuld] = useState(null);
+  const [onzeSterkte, setOnzeSterkte] = useState(null);
+  const [teamRating, setTeamRating] = useState(0);
+  const [onzePos, setOnzePos] = useState(null);
+  const [poulegenoten, setPoulegenoten] = useState(null);
+  const [goals, setGoals] = useState(0);
+  const [finishData, setFinishData] = useState(null);
+  const [prevScreen, setPrevScreen] = useState("start");
+  const [naamPrompt, setNaamPrompt] = useState(false);
+  const [naamConfirmed, setNaamConfirmed] = useState(false);
+  const goalsRef = useRef(0);
+
+  async function startGame() {
+    // Controleer of de naam al bestaat op het scorebord.
+    if (naam.trim() && !naamConfirmed) {
+      setLoading(true);
+      const bestaat = await naamBestaat(naam);
+      setLoading(false);
+      if (bestaat) { setNaamPrompt(true); return; }  // vraag eerst om bevestiging
+    }
+    setNaamPrompt(false);
+    setNaamConfirmed(false);
+    setLoading(true);
+    // Precompute group probabilities (heavy). Defer so button shows loading.
+    setTimeout(() => {
+      ensureGroepskanssen();
+      setLoading(false);
+      setGoals(0); goalsRef.current = 0;
+      setScreen("formation");
+    }, 50);
+  }
+
+  // Speler bevestigt dat het dezelfde persoon is → doorgaan met deze naam.
+  function bevestigNaam() {
+    setNaamPrompt(false);
+    setNaamConfirmed(true);
+    setLoading(true);
+    setTimeout(() => {
+      ensureGroepskanssen();
+      setLoading(false);
+      setGoals(0); goalsRef.current = 0;
+      setScreen("formation");
+    }, 50);
+  }
+
+  // Speler kiest een andere naam → terug naar het invoerveld.
+  function anderNaam() {
+    setNaamPrompt(false);
+    setNaam("");
+  }
+
+  function pickFormation(f) { setFormation(f); setScreen("draft"); }
+
+  function draftComplete(g) { setGevuld(g); setScreen("overview"); }
+
+  function overviewContinue(g, sterkte, avgRating) {
+    setOnzeSterkte(sterkte); setTeamRating(avgRating); setScreen("group");
+  }
+
+  function addGoals(n) { goalsRef.current += n; setGoals(goalsRef.current); }
+
+  function groupComplete(pos, gekwal, poule, groupGoals) {
+    goalsRef.current += groupGoals; setGoals(goalsRef.current);
+    setOnzePos(pos); setPoulegenoten(poule);
+    if (gekwal) {
+      setScreen("knockout");
+    } else {
+      finishGame("group-out", "groepsfase");
+    }
+  }
+
+  async function knockoutFinish(kampioen, uitschakelRonde) {
+    finishGame(kampioen, uitschakelRonde);
+  }
+
+  async function finishGame(kampioen, uitschakelRonde) {
+    const isChamp = kampioen === "Wij";
+    setFinishData({ kampioen, uitschakelRonde });
+    // Save to scoreboard
+    if (naam.trim()) {
+      await saveResult(naam, teamRating, goalsRef.current, isChamp);
+    }
+    setScreen("finish");
+  }
+
+  function goScoreboard() { setPrevScreen(screen); setScreen("scoreboard"); }
+  function backFromScoreboard() { setScreen(prevScreen === "scoreboard" ? "start" : prevScreen); }
+
+  function replay() {
+    setFormation(null); setGevuld(null); setOnzeSterkte(null);
+    setTeamRating(0); setOnzePos(null); setPoulegenoten(null);
+    setGoals(0); goalsRef.current = 0; setFinishData(null);
+    setScreen("formation");
+  }
+
+  return (
+    <>
+      {screen === "start" && <StartScreen naam={naam} setNaam={setNaam} onStart={startGame} onScoreboard={goScoreboard} loading={loading} naamPrompt={naamPrompt} onBevestigNaam={bevestigNaam} onAnderNaam={anderNaam}/>}
+      {screen === "formation" && <FormationScreen onPick={pickFormation}/>}
+      {screen === "draft" && <DraftScreen formation={formation} onComplete={draftComplete}/>}
+      {screen === "overview" && <SquadOverview gevuld={gevuld} slots={FORMATIES[formation]} formation={formation} onContinue={overviewContinue}/>}
+      {screen === "group" && <GroupStage onzeSpelers={gevuld} onzeSterkte={onzeSterkte} onComplete={groupComplete}/>}
+      {screen === "knockout" && <Knockout onzeSpelers={gevuld} onzeSterkte={onzeSterkte} onzePos={onzePos} poulegenoten={poulegenoten} onFinish={knockoutFinish} addGoals={addGoals}/>}
+      {screen === "finish" && <FinishScreen kampioen={finishData.kampioen} uitschakelRonde={finishData.uitschakelRonde} teamRating={teamRating} goals={goals} onScoreboard={goScoreboard} onReplay={replay}/>}
+      {screen === "scoreboard" && <Scoreboard onBack={backFromScoreboard}/>}
+    </>
+  );
+}
+
+const root = ReactDOM.createRoot(document.getElementById("root"));
+root.render(<App/>);
+</script>
+</body>
+</html>
