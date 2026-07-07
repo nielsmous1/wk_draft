@@ -50,6 +50,11 @@ body { min-height: 100vh; overflow-x: hidden; }
 @media (prefers-reduced-motion: reduce) {
   * { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
 }
+
+@media (max-width: 760px) {
+  /* Draft: stapel de spelerslijst en de opstelling onder elkaar op mobiel */
+  .draft-grid { grid-template-columns: 1fr !important; }
+}
 </style>
 </head>
 <body>
@@ -63,6 +68,25 @@ const { useState, useEffect, useRef, useMemo } = React;
 let SPELER_NAAM = "";
 function jijLabel() { return SPELER_NAAM.trim() ? SPELER_NAAM.trim().toUpperCase() : "JIJ"; }
 function jijLabelRaw() { return SPELER_NAAM.trim() ? SPELER_NAAM.trim() : "Jij"; }
+
+// Hard mode: geen skips, ratings verborgen, minder toplanden, apart scorebord.
+let HARD_MODE = false;
+
+// Doelpuntentelling van ONS team gedurende het toernooi (voor topscorer op eindscherm).
+let TOERNOOI_SCORERS = {};
+function resetToernooiScorers() { TOERNOOI_SCORERS = {}; }
+function noteerScorers(scorersLijst) {
+  (scorersLijst || []).forEach(s => {
+    if (s && s.naam) TOERNOOI_SCORERS[s.naam] = (TOERNOOI_SCORERS[s.naam] || 0) + 1;
+  });
+}
+function topScorer() {
+  let beste = null, max = 0;
+  for (const naam in TOERNOOI_SCORERS) {
+    if (TOERNOOI_SCORERS[naam] > max) { max = TOERNOOI_SCORERS[naam]; beste = naam; }
+  }
+  return beste ? { naam: beste, goals: max } : null;
+}
 
 // ═══════════════════════════════════════════════════════════════════
 // DATA
@@ -915,13 +939,13 @@ const FORMATIES = {
   "5-3-2": [
     {pos:"GK",  x:50, y:92},
     {pos:"LWB", x:12, y:66}, {pos:"CB", x:32, y:78}, {pos:"CB", x:50, y:80}, {pos:"CB", x:68, y:78}, {pos:"RWB", x:88, y:66},
-    {pos:"CM",  x:32, y:48}, {pos:"CM", x:50, y:52}, {pos:"CM", x:68, y:48},
+    {pos:"CM",  x:32, y:50}, {pos:"CAM", x:50, y:38}, {pos:"CM", x:68, y:50},
     {pos:"ST",  x:38, y:18}, {pos:"ST", x:62, y:18},
   ],
   "3-5-2": [
     {pos:"GK",  x:50, y:92},
     {pos:"CB",  x:32, y:78}, {pos:"CB", x:50, y:80}, {pos:"CB", x:68, y:78},
-    {pos:"LWB", x:10, y:52}, {pos:"CM", x:34, y:56}, {pos:"CM", x:50, y:58}, {pos:"CM", x:66, y:56}, {pos:"RWB", x:90, y:52},
+    {pos:"LM", x:10, y:52}, {pos:"CDM", x:38, y:60}, {pos:"CAM", x:50, y:42}, {pos:"CDM", x:62, y:60}, {pos:"RM", x:90, y:52},
     {pos:"ST",  x:38, y:20}, {pos:"ST", x:62, y:20},
   ],
 };
@@ -1195,7 +1219,10 @@ function trekPoulegenoten() {
   const gew = {};
   for (const l in SQUADS) {
     const gem = SQUADS[l].players.reduce((a,[,,r])=>a+r,0)/11;
-    gew[l] = Math.pow(gem, 1.5);
+    let g = Math.pow(gem, 1.5);
+    // Hard mode: toplanden komen iets minder vaak als tegenstander.
+    if (HARD_MODE && isTopland(l)) g *= 0.5;
+    gew[l] = g;
   }
   const sel = [];
   // "Wij" heeft geen confederatie, dus telt niet mee in de limiet.
@@ -1220,19 +1247,22 @@ function trekPoulegenoten() {
 
 function bouwBracket(onzePos, onzePoulegenoten) {
   ensureGroepskanssen();
-  // Onze poulegenoten worden NIET meer helemaal uitgesloten: wie met ons meegaat
-  // uit de groep hoort ook in het schema thuis. We nemen de sterkste poulegenoot
-  // mee als mede-gekwalificeerde (realistisch: nummer 1 en 2 gaan door).
+  // Poulegenoten die met ons meegaan uit de groep horen ook in het schema — en NOOIT
+  // in onze helft, zodat we ze in de knock-out niet vroeg kunnen treffen.
+  // 1e: nr2 gaat mee, en soms de beste nr3. 2e: nr1 gaat mee, soms nr3.
+  // 3e (als wij door zijn): nr1 én nr2 gingen door.
   const poulegenotenGesorteerd = [...onzePoulegenoten].sort((a,b) =>
     berekenSterkte(b).overall - berekenSterkte(a).overall);
-  const medeGekwalificeerd = [];
-  // Als wij 1e of 2e werden, gaat doorgaans nog één poulegenoot mee; als 3e, kan het ook.
-  const aantalMee = onzePos <= 2 ? 1 : (Math.random() < 0.5 ? 1 : 0);
-  for (let i=0; i<aantalMee && i<poulegenotenGesorteerd.length; i++) {
-    medeGekwalificeerd.push(poulegenotenGesorteerd[i]);
-  }
+  let aantalMee;
+  if (onzePos === 1)      aantalMee = Math.random() < 0.4 ? 2 : 1; // nr2 zeker, nr3 soms
+  else if (onzePos === 2) aantalMee = Math.random() < 0.4 ? 2 : 1; // nr1 zeker, nr3 soms
+  else                    aantalMee = 2;                            // wij 3e → nr1 en nr2 door
+  aantalMee = Math.min(aantalMee, poulegenotenGesorteerd.length);
+  const medeGekwalificeerd = poulegenotenGesorteerd.slice(0, aantalMee);
 
-  const alGesel = new Set(["Wij", ...medeGekwalificeerd]);
+  // Sluit ALLE poulegenoten uit van de algemene loting: de gekwalificeerde(n) plaatsen
+  // we apart in de onderste helft, de niet-gekwalificeerde horen niet in het schema.
+  const alGesel = new Set(["Wij", ...onzePoulegenoten]);
   const nr1s = [], nr2s = [], nr3sAll = [];
   for (const letter in WK2026_GROEPEN) {
     const landen = WK2026_GROEPEN[letter];
@@ -1264,16 +1294,37 @@ function bouwBracket(onzePos, onzePoulegenoten) {
     const g = weightedChoice(l3, k3);
     getrokkenNr3.push(g); alGesel.add(g);
   }
-  let bracket = [["Wij", `#${onzePos}`]];
-  medeGekwalificeerd.forEach(l => bracket.push([l, "poule"]));  // onze mede-gekwalificeerde(n)
-  nr1s.slice(0,11).forEach(l => bracket.push([l,"#1"]));
-  nr2s.slice(0,12).forEach(l => bracket.push([l,"#2"]));
-  getrokkenNr3.slice(0,8).forEach(l => bracket.push([l,"#3"]));
-  // Beperk tot 32 teams totaal.
-  bracket = bracket.slice(0, 32);
-  const rest = bracket.slice(1);
-  for (let i=rest.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [rest[i],rest[j]]=[rest[j],rest[i]]; }
-  return [bracket[0], ...rest];
+  // Bouw de 32-lijst: "Wij" + mede-gekwalificeerde(n) + de rest.
+  const overige = [];
+  nr1s.forEach(l => overige.push([l,"#1"]));
+  nr2s.forEach(l => overige.push([l,"#2"]));
+  getrokkenNr3.forEach(l => overige.push([l,"#3"]));
+  // Vul aan tot genoeg landen (mocht er iets ontbreken).
+  {
+    const gebruikt = new Set([ "Wij", ...medeGekwalificeerd, ...overige.map(o=>o[0]) ]);
+    for (const l in SQUADS) {
+      if ((1 + medeGekwalificeerd.length + overige.length) >= 32) break;
+      if (!gebruikt.has(l)) { overige.push([l, "#3"]); gebruikt.add(l); }
+    }
+  }
+  // Hussel de "overige" landen.
+  for (let i=overige.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [overige[i],overige[j]]=[overige[j],overige[i]]; }
+
+  // Verdeel over 32 plekken: index 0 = Wij (bovenste helft 0-15),
+  // poulegenoten in de onderste helft (16-31) zodat we ze pas in de finale treffen.
+  const bracket = new Array(32).fill(null);
+  bracket[0] = ["Wij", `#${onzePos}`];
+  // Plaats mede-gekwalificeerde(n) op willekeurige lege plek in de onderste helft.
+  const onderHelftPlekken = [];
+  for (let i=16;i<32;i++) onderHelftPlekken.push(i);
+  for (let i=onderHelftPlekken.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [onderHelftPlekken[i],onderHelftPlekken[j]]=[onderHelftPlekken[j],onderHelftPlekken[i]]; }
+  medeGekwalificeerd.forEach((l,idx) => { if (idx < onderHelftPlekken.length) bracket[onderHelftPlekken[idx]] = [l, "poule"]; });
+  // Vul alle resterende lege plekken met de overige landen.
+  let oi = 0;
+  for (let i=0;i<32;i++){
+    if (bracket[i] === null) { bracket[i] = overige[oi++] || ["Bye","-"]; }
+  }
+  return bracket;
 }
 
 const RONDES = ["Ronde van 32","Ronde van 16","Kwartfinale","Halve finale","Finale"];
@@ -1300,89 +1351,129 @@ function jsonbinKlaar() {
 }
 
 // --- JSONBin: hele ranglijst is één array in de bin ---
-async function jsonbinLees() {
+// Leest de hele bin-inhoud als object {spelers, spelersHard}.
+async function jsonbinLeesRuw() {
   const res = await fetch(`${JSONBIN_BASE}/${SCOREBORD_CONFIG.BIN_ID}/latest`, {
     method: "GET",
     headers: { "X-Access-Key": SCOREBORD_CONFIG.API_KEY, "X-Bin-Meta": "false" },
   });
   if (!res.ok) throw new Error(`JSONBin lees-fout ${res.status}`);
   const data = await res.json();
-  // Body kan zijn: kale array, {spelers:[...]}, of (met meta) {record:...}
   let inner = data;
   if (inner && !Array.isArray(inner) && inner.record !== undefined) inner = inner.record;
-  if (inner && !Array.isArray(inner) && Array.isArray(inner.spelers)) inner = inner.spelers;
-  return Array.isArray(inner) ? inner : [];
+  // Backwards compat: oude bin was kale array of {spelers:[...]}.
+  if (Array.isArray(inner)) return { spelers: inner, spelersHard: [] };
+  return {
+    spelers: Array.isArray(inner?.spelers) ? inner.spelers : [],
+    spelersHard: Array.isArray(inner?.spelersHard) ? inner.spelersHard : [],
+  };
 }
 
-async function jsonbinSchrijf(spelers) {
+async function jsonbinLees(hard) {
+  const ruw = await jsonbinLeesRuw();
+  return hard ? ruw.spelersHard : ruw.spelers;
+}
+
+// Schrijft één van beide borden terug, zonder het andere te overschrijven.
+async function jsonbinSchrijf(spelers, hard) {
+  const ruw = await jsonbinLeesRuw().catch(() => ({ spelers: [], spelersHard: [] }));
+  const body = hard ? { spelers: ruw.spelers, spelersHard: spelers }
+                    : { spelers: spelers, spelersHard: ruw.spelersHard };
   const res = await fetch(`${JSONBIN_BASE}/${SCOREBORD_CONFIG.BIN_ID}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json", "X-Access-Key": SCOREBORD_CONFIG.API_KEY },
-    body: JSON.stringify({ spelers }),
+    body: JSON.stringify(body),
   });
   if (!res.ok) throw new Error(`JSONBin schrijf-fout ${res.status}`);
   return true;
 }
 
-// --- Lokale fallback (per browser) ---
-function localLees() {
-  try { return JSON.parse(localStorage.getItem("wk_scorebord") || "[]"); }
+// --- Lokale fallback (per browser), apart per modus ---
+function localSleutel(hard) { return hard ? "wk_scorebord_hard" : "wk_scorebord"; }
+function localLees(hard) {
+  try { return JSON.parse(localStorage.getItem(localSleutel(hard)) || "[]"); }
   catch(e) { return []; }
 }
-function localSchrijf(spelers) {
-  try { localStorage.setItem("wk_scorebord", JSON.stringify(spelers)); } catch(e) {}
+function localSchrijf(spelers, hard) {
+  try { localStorage.setItem(localSleutel(hard), JSON.stringify(spelers)); } catch(e) {}
 }
 
-function voegResultaatToe(spelers, naam, teamRating, goals, isChampion) {
+function voegResultaatToe(spelers, naam, teamRating, goals, isChampion, scorerTally) {
   const sleutel = naam.toLowerCase().trim();
   let p = spelers.find(x => (x.naam || "").toLowerCase().trim() === sleutel);
-  if (!p) { p = { naam, games:0, totalRating:0, bestRating:0, goals:0, championships:0 }; spelers.push(p); }
+  if (!p) { p = { naam, games:0, totalRating:0, bestRating:0, goals:0, championships:0, topscorers:{} }; spelers.push(p); }
   p.games += 1;
   p.totalRating += teamRating;
   p.bestRating = Math.max(p.bestRating || 0, teamRating);  // hoogste teamrating uit één toernooi
   p.goals += goals;
   if (isChampion) p.championships += 1;
+  // Voeg de doelpunten van dit toernooi toe aan de all-time topscorer-telling van deze gebruiker.
+  if (!p.topscorers) p.topscorers = {};
+  if (scorerTally) {
+    for (const spelerNaam in scorerTally) {
+      p.topscorers[spelerNaam] = (p.topscorers[spelerNaam] || 0) + scorerTally[spelerNaam];
+    }
+  }
   p.naam = naam;
   return p;
 }
 
-// Bestaat deze naam al op het (gedeelde) scorebord?
+// Bepaal de all-time topscorer (voetballer) van een scorebord-speler.
+function alltimeTopscorer(p) {
+  if (!p || !p.topscorers) return null;
+  let beste = null, max = 0;
+  for (const n in p.topscorers) {
+    if (p.topscorers[n] > max) { max = p.topscorers[n]; beste = n; }
+  }
+  return beste ? { naam: beste, goals: max } : null;
+}
+
+// Bestaat deze naam al op het (gedeelde) scorebord van de huidige modus?
 async function naamBestaat(naam) {
   const sleutel = naam.toLowerCase().trim();
   try {
-    const spelers = await loadScoreboard();
+    const spelers = await loadScoreboard(HARD_MODE);
     return spelers.some(x => (x.naam || "").toLowerCase().trim() === sleutel);
   } catch(e) { return false; }
 }
 
 async function saveResult(naam, teamRating, goals, isChampion) {
-  // JSONBin: lees hele lijst, werk speler bij, schrijf terug
+  const hard = HARD_MODE;
+  const tally = { ...TOERNOOI_SCORERS };
   if (jsonbinKlaar()) {
     try {
-      const spelers = await jsonbinLees();
-      const p = voegResultaatToe(spelers, naam, teamRating, goals, isChampion);
-      await jsonbinSchrijf(spelers);
+      const spelers = await jsonbinLees(hard);
+      const p = voegResultaatToe(spelers, naam, teamRating, goals, isChampion, tally);
+      await jsonbinSchrijf(spelers, hard);
       return p;
     } catch(e) {
       console.error("JSONBin opslaan mislukt, val terug op lokaal:", e);
-      // val door naar lokaal zodat de score niet verloren gaat
     }
   }
-  // Lokaal
   try {
-    const spelers = localLees();
-    const p = voegResultaatToe(spelers, naam, teamRating, goals, isChampion);
-    localSchrijf(spelers);
+    const spelers = localLees(hard);
+    const p = voegResultaatToe(spelers, naam, teamRating, goals, isChampion, tally);
+    localSchrijf(spelers, hard);
     return p;
   } catch(e) { console.error("lokaal opslaan mislukt", e); return null; }
 }
 
-async function loadScoreboard() {
+// Wis het scorebord van één modus (leeg de lijst).
+async function clearScoreboard(hard) {
   if (jsonbinKlaar()) {
-    try { return await jsonbinLees(); }
+    try { await jsonbinSchrijf([], hard); return true; }
+    catch(e) { console.error("JSONBin wissen mislukt:", e); }
+  }
+  try { localSchrijf([], hard); return true; }
+  catch(e) { console.error("lokaal wissen mislukt", e); return false; }
+}
+
+async function loadScoreboard(hard) {
+  if (jsonbinKlaar()) {
+    try { return await jsonbinLees(hard); }
     catch(e) { console.error("JSONBin laden mislukt, val terug op lokaal:", e); }
   }
-  return localLees();
+  return localLees(hard);
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -1457,7 +1548,7 @@ function Btn({ children, onClick, variant="primary", disabled, style }) {
 // ═══════════════════════════════════════════════════════════════════
 // SCREEN: START
 // ═══════════════════════════════════════════════════════════════════
-function StartScreen({ naam, setNaam, onStart, onScoreboard, loading, naamPrompt, onBevestigNaam, onAnderNaam }) {
+function StartScreen({ naam, setNaam, onStart, onScoreboard, loading, naamPrompt, onBevestigNaam, onAnderNaam, mode, setMode }) {
   return (
     <div style={{minHeight:"100vh", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", padding:"24px", position:"relative"}}>
       <div style={{position:"absolute", top:0, left:0, right:0, height:"55vh",
@@ -1493,8 +1584,25 @@ function StartScreen({ naam, setNaam, onStart, onScoreboard, loading, naamPrompt
             style={{fontFamily:"'Barlow Condensed', sans-serif", fontSize:22, fontWeight:600, textAlign:"center",
               background:"var(--panel)", border:"1.5px solid var(--line)", borderRadius:10, color:"var(--white)",
               padding:"12px 20px", width:280, outline:"none"}}/>
+          {/* Moeilijkheidskeuze */}
+          <div style={{display:"flex", gap:8, background:"var(--panel)", border:"1.5px solid var(--line)", borderRadius:10, padding:4}}>
+            {[["normaal","Normaal"],["hard","Hard"]].map(([m,label])=>(
+              <button key={m} onClick={()=>setMode(m)} className="cond" style={{
+                padding:"8px 22px", borderRadius:7, fontSize:16, fontWeight:700, cursor:"pointer", border:"none",
+                textTransform:"uppercase", letterSpacing:"0.03em", transition:"all 0.15s",
+                background: mode===m ? (m==="hard"?"var(--red)":"var(--grass)") : "transparent",
+                color: mode===m ? (m==="hard"?"#2B0009":"#03260F") : "var(--muted)"}}>
+                {label}
+              </button>
+            ))}
+          </div>
+          <div className="mono" style={{fontSize:11, color:"var(--muted)", maxWidth:300, textAlign:"center", lineHeight:1.5, minHeight:28}}>
+            {mode==="hard"
+              ? "HARD: geen skips, ratings verborgen, minder toplanden."
+              : "NORMAAL: 3 skips, ratings zichtbaar."}
+          </div>
           <div style={{display:"flex", gap:12, flexWrap:"wrap", justifyContent:"center"}}>
-            <Btn onClick={onStart} disabled={!naam.trim() || loading}>
+            <Btn onClick={onStart} disabled={!naam.trim() || loading} variant={mode==="hard"?"danger":"primary"}>
               {loading ? "Laden..." : "Start je toernooi"}
             </Btn>
             <Btn variant="ghost" onClick={onScoreboard}>Scorebord</Btn>
@@ -1574,7 +1682,7 @@ function MiniPitch({ formation }) {
 function DraftScreen({ formation, onComplete }) {
   const slots = FORMATIES[formation];
   const [gevuld, setGevuld] = useState(Array(slots.length).fill(null));
-  const [skips, setSkips] = useState(3);
+  const [skips, setSkips] = useState(HARD_MODE ? 0 : 3);
   const [currentLand, setCurrentLand] = useState(null);
   const [beschikbaar, setBeschikbaar] = useState([]);
   const [posKeuze, setPosKeuze] = useState(null); // {speler, slots:[idx,...]}
@@ -1699,8 +1807,8 @@ function DraftScreen({ formation, onComplete }) {
         <div style={{height:"100%", width:`${progress}%`, background:"var(--grass)", transition:"width 0.4s ease", borderRadius:3}}/>
       </div>
 
-      <div style={{display:"grid", gridTemplateColumns:"minmax(0, 1fr) minmax(300px, 380px)", gap:24, alignItems:"start"}}>
-        {/* LEFT: country + players OR position picker */}
+      <div className="draft-grid" style={{display:"grid", gridTemplateColumns:"minmax(0, 1fr) minmax(280px, 380px)", gap:24, alignItems:"start"}}>
+        {/* LEFT: country + players OR position prompt */}
         <div>
           {spinning && (
             <div style={{animation:"fadeIn 0.2s ease"}}>
@@ -1734,7 +1842,7 @@ function DraftScreen({ formation, onComplete }) {
                   <div className="cond" style={{fontSize:32, fontWeight:800, color:"var(--white)", lineHeight:1}}>{currentLand}</div>
                 </div>
               </div>
-              <div style={{display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(250px, 1fr))", gap:10}}>
+              <div style={{display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(240px, 1fr))", gap:10}}>
                 {beschikbaar.map((sp,i)=>(
                   <PlayerPick key={sp.naam} sp={sp} onClick={()=>kiesSpeler(sp)} delay={i*0.03}/>
                 ))}
@@ -1757,30 +1865,37 @@ function DraftScreen({ formation, onComplete }) {
           {posKeuze && (
             <div style={{animation:"popIn 0.3s ease"}}>
               <div className="cond" style={{fontSize:26, fontWeight:800, color:"var(--white)", marginBottom:4}}>
-                Waar zet je {posKeuze.speler.naam}?
+                Waar zet je {achternaam(posKeuze.speler.naam)}?
               </div>
-              <div style={{color:"var(--text)", marginBottom:18, fontSize:15}}>
-                Klik op een groene positie in je opstelling.
+              <div style={{color:"var(--text)", marginBottom:12, fontSize:15}}>
+                Tik op een groene positie in je opstelling{typeof window!=="undefined" && window.innerWidth<760 ? " hieronder" : " hiernaast"}.
               </div>
-              <SelectablePitch formation={formation} gevuld={gevuld}
-                highlightSlots={posKeuze.slots} onPickSlot={(idx)=>plaats(posKeuze.speler, idx)}/>
-              <div style={{marginTop:14, textAlign:"center"}}>
-                <button onClick={()=>setPosKeuze(null)} className="cond" style={{
-                  background:"transparent", border:"none", color:"var(--muted)", cursor:"pointer",
-                  fontSize:14, fontWeight:700, textTransform:"uppercase", letterSpacing:"0.05em"}}>
-                  ← Andere speler kiezen
-                </button>
+              <div style={{display:"flex", flexWrap:"wrap", gap:8, marginBottom:6}}>
+                {posKeuze.slots.map(idx=>(
+                  <button key={idx} onClick={()=>plaats(posKeuze.speler, idx)} className="cond" style={{
+                    background:"var(--grass)", color:"#03260F", border:"none", borderRadius:8,
+                    padding:"8px 16px", cursor:"pointer", fontSize:15, fontWeight:800}}>
+                    {slots[idx].pos}
+                  </button>
+                ))}
               </div>
+              <button onClick={()=>setPosKeuze(null)} className="cond" style={{
+                background:"transparent", border:"none", color:"var(--muted)", cursor:"pointer",
+                fontSize:14, fontWeight:700, textTransform:"uppercase", letterSpacing:"0.05em", marginTop:8}}>
+                ← Andere speler kiezen
+              </button>
             </div>
           )}
         </div>
 
-        {/* RIGHT: live squad as pitch */}
-        <div style={{background:"var(--bg2)", border:"1px solid var(--line)", borderRadius:14, padding:"16px"}}>
+        {/* RIGHT: the single squad pitch — becomes interactive during a position choice */}
+        <div style={{background:"var(--bg2)", border:`1px solid ${posKeuze?"var(--grass)":"var(--line)"}`, borderRadius:14, padding:"16px", transition:"border-color 0.2s"}}>
           <div className="mono" style={{fontSize:11, color:"var(--muted)", letterSpacing:"0.2em", fontWeight:700, marginBottom:12}}>
             JOUW ELFTAL · {formation}
           </div>
-          <SelectablePitch formation={formation} gevuld={gevuld} highlightSlots={[]} onPickSlot={null} compact/>
+          <SelectablePitch formation={formation} gevuld={gevuld}
+            highlightSlots={posKeuze ? posKeuze.slots : []}
+            onPickSlot={posKeuze ? (idx)=>plaats(posKeuze.speler, idx) : null}/>
         </div>
       </div>
     </div>
@@ -1820,11 +1935,12 @@ function PitchSlot({ slot, player, highlight, onClick, compact }) {
   const size = compact ? 34 : 42;
   const filled = !!player;
   const bg = highlight ? "var(--grass)" : filled
-    ? (player.rating>=88?"var(--gold)":player.rating>=83?"var(--grass)":"var(--panel2)")
+    ? (HARD_MODE ? "var(--panel2)" : (player.rating>=88?"var(--gold)":player.rating>=83?"var(--grass)":"var(--panel2)"))
     : "rgba(19,31,71,0.7)";
   const border = highlight ? "var(--grass)" : filled
-    ? (player.rating>=88?"var(--gold)":player.rating>=83?"var(--grass)":"var(--line)")
+    ? (HARD_MODE ? "var(--line)" : (player.rating>=88?"var(--gold)":player.rating>=83?"var(--grass)":"var(--line)"))
     : "rgba(122,135,173,0.4)";
+  const txtColor = filled ? (!HARD_MODE && player.rating>=83?"#03260F":"var(--white)") : (highlight?"#03260F":"var(--muted)");
   return (
     <div style={{position:"absolute", left:`${slot.x}%`, top:`${slot.y}%`, transform:"translate(-50%,-50%)",
       display:"flex", flexDirection:"column", alignItems:"center", gap:2,
@@ -1836,11 +1952,11 @@ function PitchSlot({ slot, player, highlight, onClick, compact }) {
         border:`2px solid ${border}`,
         display:"flex", alignItems:"center", justifyContent:"center",
         fontSize: compact?14:17, fontWeight:900,
-        color: filled ? (player.rating>=83?"#03260F":"var(--white)") : (highlight?"#03260F":"var(--muted)"),
+        color: txtColor,
         boxShadow: highlight?"0 0 0 4px rgba(0,212,106,0.25)":"none",
         animation: highlight?"pulse 1.4s infinite":"none",
         transition:"all 0.15s"}}>
-        {filled ? player.rating : (highlight ? "+" : slot.pos)}
+        {filled ? (HARD_MODE ? player.slotPos || slot.pos : player.rating) : (highlight ? "+" : slot.pos)}
       </div>
       {filled && !compact && (
         <div style={{fontSize:10, fontWeight:600, color:"var(--white)", textAlign:"center", lineHeight:1.1,
@@ -1876,7 +1992,12 @@ function PlayerPick({ sp, onClick, delay }) {
         background: hover?"var(--panel2)":"var(--panel)", border:`1.5px solid ${hover?"var(--grass)":"var(--line)"}`,
         borderRadius:10, cursor:"pointer", transition:"all 0.15s", transform: hover?"translateX(3px)":"none",
         animation:`slideInLeft 0.3s ease ${delay}s both`}}>
-      <RatingBadge r={sp.rating}/>
+      {HARD_MODE ? (
+        <div className="cond" style={{width:32, height:32, minWidth:32, display:"flex", alignItems:"center", justifyContent:"center",
+          background:"var(--panel2)", border:"1.5px solid var(--line)", borderRadius:8, color:"var(--muted)", fontWeight:800, fontSize:15}}>?</div>
+      ) : (
+        <RatingBadge r={sp.rating}/>
+      )}
       <div style={{flex:1, minWidth:0}}>
         <div style={{fontWeight:600, fontSize:15, color:"var(--white)", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis"}}>{sp.naam}</div>
         <div style={{display:"flex", gap:4, marginTop:3}}>
@@ -1935,15 +2056,17 @@ function SquadOverview({ gevuld, slots, formation, onContinue }) {
       <div className="mono" style={{color:"var(--grass)", fontSize:12, fontWeight:700, letterSpacing:"0.3em", marginBottom:10}}>JOUW SELECTIE COMPLEET</div>
       <div style={{display:"flex", justifyContent:"space-between", alignItems:"flex-end", flexWrap:"wrap", gap:16, marginBottom:28}}>
         <h2 className="cond" style={{fontSize:44, fontWeight:900, color:"var(--white)"}}>{formation}</h2>
+        {!HARD_MODE && (
         <div style={{display:"flex", gap:20}}>
           <StatBlock label="AANVAL" value={sterkte.attack.toFixed(1)} color="var(--grass)"/>
           <StatBlock label="MIDDEN" value={sterkte.mid.toFixed(1)} color="#5DD9C1"/>
           <StatBlock label="DEFENSIE" value={sterkte.defense.toFixed(1)} color="var(--gold)"/>
           <StatBlock label="TEAM" value={avgRating.toFixed(1)} color="var(--white)" big/>
         </div>
+        )}
       </div>
 
-      <div style={{background:"linear-gradient(180deg, #0C3D22, #072415)", borderRadius:16, padding:"28px 20px", border:"1px solid rgba(0,212,106,0.2)", marginBottom:28}}>
+      <div style={{background:"linear-gradient(180deg, #0C3D22, #072415)", borderRadius:16, padding:"28px 20px", border:"1px solid rgba(0,212,106,0.2)", marginBottom:28, maxWidth:480, marginLeft:"auto", marginRight:"auto"}}>
         <PitchView gevuld={gevuld} slots={slots} formation={formation}/>
       </div>
 
@@ -1964,16 +2087,26 @@ function StatBlock({ label, value, color, big }) {
 }
 
 function PitchView({ gevuld, slots, formation }) {
-  // Gebruik de echte x/y-coördinaten van de formatie, zodat de opstelling klopt
-  // (spits boven, nummer 10 eronder, enz.) i.p.v. alles in vier rijen te proppen.
+  // Normaliseer x én y zodat de opstelling altijd gecentreerd is en gelijkmatig
+  // het veld vult, ongeacht de formatie.
+  const xs = slots.map(s => s.x), ys = slots.map(s => s.y);
+  const minX = Math.min(...xs), maxX = Math.max(...xs);
+  const minY = Math.min(...ys), maxY = Math.max(...ys);
+  // Ruime marges: elke speler heeft onder de cirkel nog naam + vlag, dus houd
+  // extra ruimte onderaan zodat de onderste rij niet buiten het veld valt.
+  const PADX = 15, TOP = 12, BOTTOM = 86; // marges op het veld (%)
+  const spanX = maxX - minX || 1;
+  const schaalX = (x) => 50 + ((x - (minX+maxX)/2) / spanX) * (100 - 2*PADX);
+  const schaalY = (y) => maxY === minY ? (TOP+BOTTOM)/2 : TOP + (y - minY) / (maxY - minY) * (BOTTOM - TOP);
   return (
-    <div style={{position:"relative", width:"100%", aspectRatio:"4/5", maxWidth:440, margin:"0 auto"}}>
+    <div style={{position:"relative", width:"100%", aspectRatio:"4/5", maxWidth:420, margin:"0 auto"}}>
       {slots.map((s,i)=>{
         const p = gevuld[i];
         if (!p) return null;
         return (
-          <div key={i} style={{position:"absolute", left:`${s.x}%`, top:`${s.y}%`,
-            transform:"translate(-50%,-50%)", animation:`popIn 0.4s ease ${i*0.04}s both`}}>
+          <div key={i} style={{position:"absolute", left:`${schaalX(s.x)}%`, top:`${schaalY(s.y)}%`,
+            transform:"translate(-50%,-50%)", width:0, display:"flex", justifyContent:"center",
+            animation:`popIn 0.4s ease ${i*0.04}s both`}}>
             <PitchPlayer p={{ ...p, slot:s.pos }} delay={0}/>
           </div>
         );
@@ -1983,16 +2116,17 @@ function PitchView({ gevuld, slots, formation }) {
 }
 
 function PitchPlayer({ p, delay }) {
+  const hb = HARD_MODE;
   return (
     <div style={{display:"flex", flexDirection:"column", alignItems:"center", gap:5, minWidth:76, maxWidth:110, animation:`popIn 0.4s ease ${delay}s both`}}>
       <div style={{position:"relative"}}>
         <div className="cond" style={{width:48, height:48, borderRadius:"50%",
-          background: p.rating>=88?"var(--gold)":p.rating>=83?"var(--grass)":"var(--panel2)",
-          border:`2px solid ${p.rating>=88?"var(--gold)":p.rating>=83?"var(--grass)":"var(--line)"}`,
+          background: hb?"var(--panel2)":(p.rating>=88?"var(--gold)":p.rating>=83?"var(--grass)":"var(--panel2)"),
+          border:`2px solid ${hb?"var(--line)":(p.rating>=88?"var(--gold)":p.rating>=83?"var(--grass)":"var(--line)")}`,
           display:"flex", alignItems:"center", justifyContent:"center",
-          fontSize:20, fontWeight:900, color: p.rating>=83?"#03260F":"var(--white)"}}>{p.rating}</div>
-        <div className="mono" style={{position:"absolute", top:-6, right:-8, fontSize:9, fontWeight:700,
-          background:"var(--bg)", color:"var(--muted)", padding:"1px 4px", borderRadius:4, border:"1px solid var(--line)"}}>{p.slot}</div>
+          fontSize: hb?14:20, fontWeight:900, color: (!hb && p.rating>=83)?"#03260F":"var(--white)"}}>{hb ? p.slot : p.rating}</div>
+        {!hb && <div className="mono" style={{position:"absolute", top:-6, right:-8, fontSize:9, fontWeight:700,
+          background:"var(--bg)", color:"var(--muted)", padding:"1px 4px", borderRadius:4, border:"1px solid var(--line)"}}>{p.slot}</div>}
       </div>
       <div style={{fontSize:11, fontWeight:600, color:"var(--white)", textAlign:"center", lineHeight:1.15,
         whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", maxWidth:"100%"}}>{achternaam(p.naam)}</div>
@@ -2004,7 +2138,7 @@ function PitchPlayer({ p, delay }) {
 // ═══════════════════════════════════════════════════════════════════
 // LIVE MATCH (klok-animatie met doelpunten)
 // ═══════════════════════════════════════════════════════════════════
-function LiveMatch({ homeNaam, awayNaam, gA, gB, scorersA, scorersB, extra, penaltyResult, naPenalties, onDone }) {
+function LiveMatch({ homeNaam, awayNaam, gA, gB, xgA, xgB, scorersA, scorersB, extra, penaltyResult, naPenalties, onDone }) {
   // Bouw één tijdlijn van alle doelpunten, gesorteerd op minuut.
   const doelpunten = useMemo(() => {
     const lijst = [];
@@ -2016,6 +2150,41 @@ function LiveMatch({ homeNaam, awayNaam, gA, gB, scorersA, scorersB, extra, pena
 
   const eindMinuut = (extra==="nv" || extra==="pen") ? 120 : 90;
   const DUUR_MS = eindMinuut > 90 ? 13000 : 10000; // iets langer bij verlenging
+
+  // xG-schoten: xG loopt in stappen op (per schot), niet vloeiend.
+  // Elk doelpunt = een schot met flinke xG; daarnaast willekeurige schoten door de wedstrijd.
+  // De som van alle schoten per kant komt precies uit op de eind-xG.
+  const xgSchoten = useMemo(() => {
+    function bouwSchoten(totaalXg, doelMinuten) {
+      const totaal = Math.max(0, totaalXg || 0);
+      const schoten = [];
+      // Doelpunten zijn schoten met een relatief hoge xG (0.3-0.8), maar nooit meer dan het totaal.
+      let gebruikt = 0;
+      doelMinuten.forEach(min => {
+        const w = Math.min(0.3 + Math.random()*0.5, Math.max(0.05, totaal - gebruikt - 0.02));
+        schoten.push({ min, xg: w, goal: true });
+        gebruikt += w;
+      });
+      // De rest van de xG verdelen over willekeurige "misses" op willekeurige minuten.
+      let rest = Math.max(0, totaal - gebruikt);
+      const nMisses = rest > 0.05 ? 2 + Math.floor(Math.random()*4) : 0;
+      for (let i=0;i<nMisses;i++){
+        const deel = i===nMisses-1 ? rest : rest * (0.2 + Math.random()*0.5);
+        rest -= deel;
+        schoten.push({ min: 1 + Math.floor(Math.random()*eindMinuut), xg: deel, goal:false });
+      }
+      // Eventuele afrondingsrest bij het laatste schot.
+      if (rest > 0.001 && schoten.length) schoten[schoten.length-1].xg += rest;
+      schoten.sort((a,b)=>a.min-b.min);
+      return schoten;
+    }
+    const aMin = (scorersA||[]).map(s=>s.min);
+    const bMin = (scorersB||[]).map(s=>s.min);
+    return {
+      a: bouwSchoten(xgA, aMin),
+      b: bouwSchoten(xgB, bMin),
+    };
+  }, [xgA, xgB, scorersA, scorersB, eindMinuut]);
 
   const [minuut, setMinuut] = useState(0);
   const [klaar, setKlaar] = useState(false);
@@ -2067,10 +2236,18 @@ function LiveMatch({ homeNaam, awayNaam, gA, gB, scorersA, scorersB, extra, pena
         </div>
       </div>
 
-      {/* Voortgangsbalk */}
-      <div style={{height:4, background:"var(--bg)", borderRadius:2, overflow:"hidden", marginBottom:18}}>
-        <div style={{height:"100%", width:`${(minuut/eindMinuut)*100}%`,
-          background: inVerlenging ? "var(--gold)" : "var(--grass)", borderRadius:2, transition:"width 0.1s linear"}}/>
+      {/* Voortgangsbalk — 0-90 min vult tot 100%; verlenging pas zichtbaar zodra die begint */}
+      <div style={{height:4, background:"var(--bg)", borderRadius:2, overflow:"hidden", marginBottom:18, position:"relative"}}>
+        {/* Reguliere speeltijd (0-90) */}
+        <div style={{position:"absolute", left:0, top:0, height:"100%",
+          width:`${(Math.min(minuut,90)/90)*100}%`,
+          background:"var(--grass)", borderRadius:2, transition:"width 0.1s linear"}}/>
+        {/* Verlenging (90-120) groeit pas ná minuut 90 over de balk heen */}
+        {inVerlenging && (
+          <div style={{position:"absolute", left:0, top:0, height:"100%",
+            width:`${((minuut-90)/30)*100}%`,
+            background:"var(--gold)", borderRadius:2, transition:"width 0.1s linear"}}/>
+        )}
       </div>
 
       {/* Teams + live score */}
@@ -2115,8 +2292,31 @@ function LiveMatch({ homeNaam, awayNaam, gA, gB, scorersA, scorersB, extra, pena
         </div>
       </div>
 
+      {/* xG — loopt in stappen op per schot (doelpunten + willekeurige kansen) */}
+      {xgA != null && xgB != null && (() => {
+        // Tel de xG van alle schoten t/m de huidige minuut. Na afloop: alles.
+        const somTot = (schoten) => schoten.reduce((acc,s)=> acc + ((klaar || s.min <= minuut) ? s.xg : 0), 0);
+        const xa = Math.max(0, somTot(xgSchoten.a));
+        const xb = Math.max(0, somTot(xgSchoten.b));
+        const tot = xa + xb || 1;
+        const pa = (xa/tot)*100;
+        return (
+          <div style={{marginTop:14, padding:"10px 16px", background:"var(--bg2)", borderRadius:10, border:"1px solid var(--line)"}}>
+            <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:6}}>
+              <span className="cond" style={{fontSize:18, fontWeight:800, color: xa>=xb?"var(--grass)":"var(--muted)"}}>{xa.toFixed(2)}</span>
+              <span className="mono" style={{fontSize:10, color:"var(--muted)", letterSpacing:"0.15em", fontWeight:700}}>xG</span>
+              <span className="cond" style={{fontSize:18, fontWeight:800, color: xb>xa?"var(--grass)":"var(--muted)"}}>{xb.toFixed(2)}</span>
+            </div>
+            <div style={{display:"flex", height:6, borderRadius:3, overflow:"hidden", background:"var(--bg)"}}>
+              <div style={{width:`${pa}%`, background:"var(--grass)", transition:"width 0.3s ease"}}/>
+              <div style={{width:`${100-pa}%`, background:"var(--gold)", transition:"width 0.3s ease"}}/>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Knop */}
-      <div style={{textAlign:"center", marginTop:8}}>
+      <div style={{textAlign:"center", marginTop:14}}>
         {klaar ? (
           <Btn onClick={onDone}>{naPenalties ? "Naar strafschoppen →" : "Verder →"}</Btn>
         ) : (
@@ -2215,12 +2415,14 @@ function GroupStage({ onzeSpelers, onzeSterkte, onComplete }) {
     const spelersPeng = onzeSpelers.map(p => [p.naam, p.posities, p.rating]);
 
     for (const teg of poulegenoten) {
-      const { gA, gB } = simuleerWedstrijd(onzeSterkte, sterktesPoel[teg]);
+      const { gA, gB, lamA, lamB } = simuleerWedstrijd(onzeSterkte, sterktesPoel[teg]);
       if (gA>gB) stand["Wij"].pts+=3; else if (gB>gA) stand[teg].pts+=3; else { stand["Wij"].pts++; stand[teg].pts++; }
       stand["Wij"].gd+=gA-gB; stand[teg].gd+=gB-gA; stand["Wij"].gf+=gA; stand[teg].gf+=gB;
+      const onzeScorers = genereerScorers(gA, spelersPeng);
+      noteerScorers(onzeScorers);
       onzeWedstrijden.push({
-        teg, gA, gB,
-        scorersA: genereerScorers(gA, spelersPeng),
+        teg, gA, gB, xgA:lamA, xgB:lamB,
+        scorersA: onzeScorers,
         scorersB: genereerScorers(gB, SQUADS[teg].players),
       });
     }
@@ -2289,6 +2491,7 @@ function GroupStage({ onzeSpelers, onzeSterkte, onComplete }) {
         const w = data.onzeWedstrijden[matchIdx];
         return (
           <LiveMatch key={matchIdx} homeNaam="Jij" awayNaam={w.teg} gA={w.gA} gB={w.gB}
+            xgA={w.xgA} xgB={w.xgB}
             scorersA={w.scorersA} scorersB={w.scorersB}
             onDone={()=>setMatchIdx(matchIdx+1)}/>
         );
@@ -2356,23 +2559,108 @@ function QualVerdict({ data, onComplete }) {
 // ═══════════════════════════════════════════════════════════════════
 // SCREEN: KNOCKOUT
 // ═══════════════════════════════════════════════════════════════════
+// Toont de volledige knock-out bracket in twee helften (16 + 16) met verbindingslijnen.
+// `startTeams` = 32 teams in bracketvolgorde, `historie` = per gespeelde ronde de winnaars.
+function BracketView({ startTeams, historie }) {
+  // Bouw per ronde de teams (32 -> 16 -> 8 -> 4 -> 2 -> 1).
+  const rondes = [startTeams.map(([t]) => t)];
+  for (let r=0; r<historie.length; r++) {
+    if (!historie[r]) break;
+    rondes.push(historie[r].map(m => m.winnaar));
+  }
+
+  // Vlag-only cel
+  function Cel({ team }) {
+    const isUs = team === "Wij";
+    const leeg = !team || team === "Bye";
+    return (
+      <div title={leeg ? "" : (isUs ? jijLabel() : team)} style={{
+        display:"flex", alignItems:"center", justifyContent:"center",
+        width:26, height:20, borderRadius:4, boxSizing:"border-box",
+        background: isUs ? "rgba(0,212,106,0.22)" : leeg ? "transparent" : "var(--bg2)",
+        border:`1px solid ${isUs ? "var(--grass)" : leeg ? "rgba(38,53,104,0.4)" : "var(--line)"}`,
+        opacity: leeg ? 0.35 : 1}}>
+        {!leeg && <Flag team={isUs?"You FC":team} size={14}/>}
+      </div>
+    );
+  }
+
+  // Eén kolom met N cellen + verbindingslijnen naar de volgende ronde.
+  // `richting` = "right" (linkerhelft, lijnen naar rechts) of "left" (rechterhelft).
+  function Kolom({ teams, richting }) {
+    return (
+      <div style={{display:"flex", flexDirection:"column", justifyContent:"space-around", flex:1, minWidth:38}}>
+        {teams.map((t,i)=>{
+          const paarTop = i % 2 === 0;
+          return (
+            <div key={i} style={{display:"flex", alignItems:"center", flex:1, minHeight:22,
+              flexDirection: richting==="right" ? "row" : "row-reverse"}}>
+              <Cel team={t}/>
+              <div style={{flex:1, alignSelf:"stretch", position:"relative", minWidth:8}}>
+                {/* horizontale stub vanuit de cel */}
+                <div style={{position:"absolute", top:"50%", [richting==="right"?"left":"right"]:0, width:"50%", height:1, background:"var(--line)"}}/>
+                {/* verticale lijn die het paar samenbrengt naar het midden */}
+                <div style={{position:"absolute", [richting==="right"?"right":"left"]:0,
+                  [paarTop?"top":"bottom"]:"50%", height:"50%", width:1, background:"var(--line)"}}/>
+                {/* korte horizontale lijn vanaf het samenkomstpunt naar de volgende kolom (alleen bovenste van paar) */}
+                {paarTop && (
+                  <div style={{position:"absolute", top:"100%", [richting==="right"?"right":"left"]:0, width:"50%", height:1, background:"var(--line)"}}/>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
+  function helft(ronde, kant) {
+    const helftLen = Math.ceil(ronde.length/2);
+    return kant==="links" ? ronde.slice(0, helftLen) : ronde.slice(helftLen);
+  }
+
+  const finale = rondes[5] ? rondes[5][0] : null;
+
+  return (
+    <div style={{overflowX:"auto", padding:"6px 0", marginBottom:20}}>
+      <div style={{display:"flex", alignItems:"stretch", gap:0, minWidth:560, minHeight:340}}>
+        {/* LINKERHELFT: 1/16 -> 1/2, lijnen naar rechts */}
+        {[0,1,2,3].map(r => (
+          <Kolom key={"L"+r} teams={helft(rondes[r]||[], "links")} richting="right"/>
+        ))}
+
+        {/* MIDDEN: finale */}
+        <div style={{display:"flex", flexDirection:"column", justifyContent:"center", alignItems:"center", minWidth:56, gap:5, padding:"0 4px"}}>
+          <div style={{fontSize:16}}>🏆</div>
+          <Cel team={finale}/>
+        </div>
+
+        {/* RECHTERHELFT: 1/2 -> 1/16, lijnen naar links */}
+        {[3,2,1,0].map(r => (
+          <Kolom key={"R"+r} teams={helft(rondes[r]||[], "rechts")} richting="left"/>
+        ))}
+      </div>
+      <div style={{display:"flex", justifyContent:"space-between", maxWidth:560, margin:"6px auto 0"}}>
+        <div className="mono" style={{fontSize:9, color:"var(--muted)"}}>← 1/16 · 1/8 · 1/4 · 1/2</div>
+        <div className="mono" style={{fontSize:9, color:"var(--muted)"}}>1/2 · 1/4 · 1/8 · 1/16 →</div>
+      </div>
+    </div>
+  );
+}
+
 function Knockout({ onzeSpelers, onzeSterkte, onzePos, poulegenoten, onFinish, addGoals }) {
   const [bracket] = useState(() => bouwBracket(onzePos, poulegenoten));
-  const [teams, setTeams] = useState(() => {
-    let t = bracket.map(([team]) => team);
-    while (t.length % 2 !== 0) t.push("Bye");
-    if (!t.includes("Wij")) t[0] = "Wij";
-    return t;
-  });
+  const [teams, setTeams] = useState(() => bracket.map(([team]) => team));
   const [rondeNr, setRondeNr] = useState(0);
   const [wijDoor, setWijDoor] = useState(true);
-  const [phase, setPhase] = useState("matchups"); // matchups | penalties | results
+  const [phase, setPhase] = useState("matchups"); // matchups | live | penalties | results
   const [paren, setParen] = useState(null);
   const [rondeResults, setRondeResults] = useState(null);
   const [pendingPenalty, setPendingPenalty] = useState(null);
   const [uitschakelRonde, setUitschakelRonde] = useState(null);
   const [liveKlaar, setLiveKlaar] = useState(false); // is de live-animatie van onze wedstrijd afgelopen?
   const [livePhase, setLivePhase] = useState(null); // {ourResult, results, nieuwDoor, uitRonde, ourPenalty}
+  const [rondeHistorie, setRondeHistorie] = useState([]); // per gespeelde ronde: lijst van {a,b,winnaar}
   const spelersPeng = useMemo(() => onzeSpelers.map(p => [p.naam, p.posities, p.rating]), [onzeSpelers]);
 
   function sterkteVan(t) {
@@ -2381,18 +2669,10 @@ function Knockout({ onzeSpelers, onzeSterkte, onzePos, poulegenoten, onFinish, a
   }
 
   function maakParen() {
-    let p;
-    if (wijDoor) {
-      const nietWij = teams.filter(t => t !== "Wij");
-      for (let i=nietWij.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [nietWij[i],nietWij[j]]=[nietWij[j],nietWij[i]]; }
-      p = [["Wij", nietWij[0]]];
-      for (let i=1;i<nietWij.length;i+=2) p.push([nietWij[i], nietWij[i+1] ?? "Bye"]);
-    } else {
-      const shuf = [...teams];
-      for (let i=shuf.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [shuf[i],shuf[j]]=[shuf[j],shuf[i]]; }
-      p = [];
-      for (let i=0;i<shuf.length;i+=2) p.push([shuf[i], shuf[i+1] ?? "Bye"]);
-    }
+    // Vaste bracket: paar aangrenzende teams (0v1, 2v3, ...) — geen shuffle,
+    // zodat de bracket-boom over de rondes heen intact blijft.
+    const p = [];
+    for (let i=0;i<teams.length;i+=2) p.push([teams[i], teams[i+1] ?? "Bye"]);
     setParen(p);
     setPhase("matchups");
   }
@@ -2409,7 +2689,7 @@ function Knockout({ onzeSpelers, onzeSterkte, onzePos, poulegenoten, onFinish, a
     for (const [a,b] of paren) {
       if (b === "Bye") { results.push({ a, b, bye:true, winnaar:a }); continue; }
       const isOurs = (a==="Wij" || b==="Wij");
-      const { gA, gB, extra, etA, etB } = simuleerWedstrijd(sterkteVan(a), sterkteVan(b), true);
+      const { gA, gB, lamA, lamB, extra, etA, etB } = simuleerWedstrijd(sterkteVan(a), sterkteVan(b), true);
       let winnaar, penData = null;
 
       if (extra === "pen") {
@@ -2431,10 +2711,11 @@ function Knockout({ onzeSpelers, onzeSterkte, onzePos, poulegenoten, onFinish, a
       const scorersA = isOurs && a==="Wij" ? genereerScorers(gA, spelersPeng, etA) : (SQUADS[a] ? genereerScorers(gA, SQUADS[a].players, etA) : []);
       const scorersB = isOurs && b==="Wij" ? genereerScorers(gB, spelersPeng, etB) : (SQUADS[b] ? genereerScorers(gB, SQUADS[b].players, etB) : []);
 
-      results.push({ a, b, gA, gB, extra, winnaar, penData, isOurs, scorersA, scorersB });
+      results.push({ a, b, gA, gB, xgA:lamA, xgB:lamB, extra, winnaar, penData, isOurs, scorersA, scorersB });
 
       if (isOurs) {
         addGoals(a==="Wij" ? gA : gB);
+        noteerScorers(a==="Wij" ? scorersA : scorersB);
         if (winnaar !== "Wij") { nieuwDoor = false; uitRonde = RONDES[rondeNr]; }
       }
     }
@@ -2468,6 +2749,12 @@ function Knockout({ onzeSpelers, onzeSterkte, onzePos, poulegenoten, onFinish, a
     setRondeResults(results);
     setWijDoor(nieuwDoor);
     if (uitRonde && !uitschakelRonde) setUitschakelRonde(uitRonde);
+    // Leg de ties van deze ronde vast voor de bracket-weergave.
+    setRondeHistorie(h => {
+      const nieuw = [...h];
+      nieuw[rondeNr] = results.map(r => ({ a:r.a, b:r.b, winnaar:r.winnaar }));
+      return nieuw;
+    });
     setPhase("results");
   }
 
@@ -2491,17 +2778,17 @@ function Knockout({ onzeSpelers, onzeSterkte, onzePos, poulegenoten, onFinish, a
   }
 
   // Simuleer alle resterende rondes in één keer en spring naar het eindresultaat.
-  // Alleen zinvol als wij al uitgeschakeld zijn.
+  // Alleen zinvol als wij al uitgeschakeld zijn. Houdt de bracket-boom intact.
   function directNaarEinde() {
     let huidige = rondeResults.map(r => r.winnaar).filter(w => w !== "Bye");
+    const extraHistorie = [];
+    let r = rondeNr + 1;
     while (huidige.length > 1) {
-      // Shuffle en paar op.
-      const shuf = [...huidige];
-      for (let i=shuf.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [shuf[i],shuf[j]]=[shuf[j],shuf[i]]; }
       const winnaars = [];
-      for (let i=0;i<shuf.length;i+=2){
-        const a = shuf[i], b = shuf[i+1];
-        if (b === undefined) { winnaars.push(a); continue; }
+      const ties = [];
+      for (let i=0;i<huidige.length;i+=2){
+        const a = huidige[i], b = huidige[i+1];
+        if (b === undefined) { winnaars.push(a); ties.push({a, b:"Bye", winnaar:a}); continue; }
         const { gA, gB, extra } = simuleerWedstrijd(sterkteVan(a), sterkteVan(b), true);
         let win;
         if (extra === "pen") {
@@ -2510,9 +2797,18 @@ function Knockout({ onzeSpelers, onzeSterkte, onzePos, poulegenoten, onFinish, a
           win = pen.aWint ? a : b;
         } else win = gA > gB ? a : b;
         winnaars.push(win);
+        ties.push({ a, b, winnaar:win });
       }
+      extraHistorie[r] = ties;
       huidige = winnaars;
+      r++;
     }
+    // Vul de bracket-historie aan zodat het schema compleet is (voor eventuele weergave).
+    setRondeHistorie(h => {
+      const nieuw = [...h];
+      extraHistorie.forEach((ties, idx) => { if (ties) nieuw[idx] = ties; });
+      return nieuw;
+    });
     onFinish(huidige[0], uitschakelRonde);
   }
 
@@ -2525,7 +2821,7 @@ function Knockout({ onzeSpelers, onzeSterkte, onzePos, poulegenoten, onFinish, a
       <div style={{maxWidth:720, margin:"0 auto", padding:"36px 20px 60px", animation:"fadeIn 0.4s ease"}}>
         <div className="mono" style={{color:"var(--grass)", fontSize:12, fontWeight:700, letterSpacing:"0.3em", marginBottom:16}}>{rondeNaam.toUpperCase()}</div>
         <LiveMatch homeNaam={r.a==="Wij"?"Jij":r.a} awayNaam={r.b==="Wij"?"Jij":r.b}
-          gA={r.gA} gB={r.gB} extra={r.extra}
+          gA={r.gA} gB={r.gB} xgA={r.xgA} xgB={r.xgB} extra={r.extra}
           scorersA={r.scorersA} scorersB={r.scorersB}
           naPenalties={!!livePhase.ourPenalty}
           onDone={naLive}/>
@@ -2567,30 +2863,12 @@ function Knockout({ onzeSpelers, onzeSterkte, onzePos, poulegenoten, onFinish, a
             <div style={{color:"var(--text)"}}>Je bent uitgeschakeld — bekijk hoe de rest van het toernooi verloopt.</div>
           </div>
         )}
-        {/* Other matchups preview */}
+        {/* Volledige bracket — jouw route naar de finale */}
         <div style={{marginTop:20}}>
           <div className="mono" style={{fontSize:11, color:"var(--muted)", letterSpacing:"0.2em", fontWeight:700, marginBottom:12}}>
-            {rondeNaam.toUpperCase()} — ALLE WEDSTRIJDEN
+            SCHEMA · JOUW ROUTE
           </div>
-          <div style={{display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(300px, 1fr))", gap:8}}>
-            {paren.filter(([a,b])=>b!=="Bye").map(([a,b],i)=>{
-              const isOurs = a==="Wij"||b==="Wij";
-              return (
-                <div key={i} style={{display:"flex", alignItems:"center", gap:8, padding:"10px 12px",
-                  background: isOurs?"rgba(0,212,106,0.08)":"var(--bg2)", border:`1px solid ${isOurs?"var(--grass)":"var(--line)"}`, borderRadius:8}}>
-                  <div style={{flex:1, display:"flex", alignItems:"center", justifyContent:"flex-end", gap:8}}>
-                    <div className="cond" style={{fontSize:15, fontWeight:700, color:"var(--text)", textAlign:"right"}}>{a==="Wij"?jijLabel():a}</div>
-                    <Flag team={a==="Wij"?"You FC":a} size={20}/>
-                  </div>
-                  <div className="mono" style={{fontSize:10, color:"var(--muted)"}}>vs</div>
-                  <div style={{flex:1, display:"flex", alignItems:"center", gap:8}}>
-                    <Flag team={b==="Wij"?"You FC":b} size={20}/>
-                    <div className="cond" style={{fontSize:15, fontWeight:700, color:"var(--text)"}}>{b==="Wij"?jijLabel():b}</div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+          <BracketView startTeams={bracket} historie={rondeHistorie} huidigeRonde={rondeNr}/>
         </div>
         <div style={{textAlign:"center", marginTop:28}}>
           <Btn onClick={speelRonde}>Speel {rondeNaam.toLowerCase()}</Btn>
@@ -2614,31 +2892,11 @@ function Knockout({ onzeSpelers, onzeSterkte, onzePos, poulegenoten, onFinish, a
               scorersA={ourResult.scorersA} scorersB={ourResult.scorersB} isOurs highlight/>
           </div>
         )}
-        <div className="mono" style={{fontSize:11, color:"var(--muted)", letterSpacing:"0.2em", fontWeight:700, marginBottom:10}}>OVERIGE UITSLAGEN</div>
-        {rondeResults.filter(r=>!r.isOurs && !r.bye).map((r,i)=>(
-          <div key={i} style={{display:"flex", alignItems:"center", gap:10, padding:"9px 14px", background:"var(--bg2)", border:"1px solid var(--line)", borderRadius:8, marginBottom:6}}>
-            <div style={{flex:1, display:"flex", alignItems:"center", justifyContent:"flex-end", gap:8}}>
-              <div className="cond" style={{fontSize:15, fontWeight:600, color: r.winnaar===r.a?"var(--white)":"var(--muted)", textAlign:"right"}}>{r.a==="Wij"?jijLabel():r.a}</div>
-              <Flag team={r.a==="Wij"?"You FC":r.a} size={22}/>
-            </div>
-            <div className="cond mono" style={{fontSize:15, fontWeight:800, color:"var(--white)", minWidth:44, textAlign:"center", display:"flex", flexDirection:"column", lineHeight:1.15}}>
-              <span>{r.gA}-{r.gB}</span>
-              {r.extra==="pen" && r.penData && (
-                <span style={{fontSize:10, color:"var(--gold)", fontWeight:700}}>{r.penData.scoreA}-{r.penData.scoreB} pen</span>
-              )}
-              {r.extra==="nv" && (
-                <span style={{fontSize:10, color:"var(--muted)", fontWeight:700}}>nv</span>
-              )}
-            </div>
-            <div style={{flex:1, display:"flex", alignItems:"center", gap:8}}>
-              <Flag team={r.b==="Wij"?"You FC":r.b} size={22}/>
-              <div className="cond" style={{fontSize:15, fontWeight:600, color: r.winnaar===r.b?"var(--white)":"var(--muted)"}}>{r.b==="Wij"?jijLabel():r.b}</div>
-            </div>
-          </div>
-        ))}
+        <div className="mono" style={{fontSize:11, color:"var(--muted)", letterSpacing:"0.2em", fontWeight:700, marginBottom:10}}>SCHEMA · WIE GAAT DOOR</div>
+        <BracketView startTeams={bracket} historie={rondeHistorie} huidigeRonde={rondeNr}/>
         <div style={{textAlign:"center", marginTop:28, display:"flex", gap:12, justifyContent:"center", flexWrap:"wrap"}}>
           <Btn onClick={volgendeRonde}>
-            {rondeResults.map(r=>r.winnaar).length === 1 ? "Bekijk eindresultaat →" : `Naar ${(RONDES[rondeNr+1]||"volgende ronde").toLowerCase()} →`}
+            {rondeResults.map(r=>r.winnaar).filter(w=>w!=="Bye").length === 1 ? "Bekijk eindresultaat →" : `Naar ${(RONDES[rondeNr+1]||"volgende ronde").toLowerCase()} →`}
           </Btn>
           {!wijDoor && rondeResults.map(r=>r.winnaar).filter(w=>w!=="Bye").length > 1 && (
             <Btn variant="ghost" onClick={directNaarEinde}>Direct naar eindresultaat ⏭</Btn>
@@ -2721,8 +2979,20 @@ function PenaltyShootout({ data, onDone }) {
 // ═══════════════════════════════════════════════════════════════════
 // SCREEN: FINISH (champion or eliminated)
 // ═══════════════════════════════════════════════════════════════════
-function FinishScreen({ kampioen, uitschakelRonde, teamRating, goals, gevuld, onScoreboard, onReplay }) {
+function FinishScreen({ kampioen, uitschakelRonde, teamRating, goals, gevuld, formation, onScoreboard, onReplay }) {
   const isChamp = kampioen === "Wij";
+  // Sorteer de lijst zoals op het veld: van voor naar achter (spits eerst, keeper laatst),
+  // en binnen een linie van rechts naar links (hoge x eerst).
+  const gesorteerd = useMemo(() => {
+    if (!gevuld) return [];
+    const slots = FORMATIES[formation] || [];
+    // Vaste volgorde: keeper, dan verdediging (rechts→links), middenveld, aanval (rechts→links).
+    const VOLGORDE = ["GK","RB","RWB","CB","LB","LWB","CDM","CM","RM","LM","CAM","RW","LW","ST"];
+    const rang = pos => { const i = VOLGORDE.indexOf(pos); return i < 0 ? 99 : i; };
+    return gevuld.map((p,i) => ({ p, pos: (slots[i] && slots[i].pos) || p.slotPos || (p.posities && p.posities[0]) }))
+      .sort((a,b) => rang(a.pos) - rang(b.pos) || (b.p.rating||0) - (a.p.rating||0))
+      .map(x => x.p);
+  }, [gevuld, formation]);
   return (
     <div style={{minHeight:"100vh", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", padding:"40px 20px", position:"relative", overflow:"hidden"}}>
       {isChamp && <Confetti/>}
@@ -2752,9 +3022,9 @@ function FinishScreen({ kampioen, uitschakelRonde, teamRating, goals, gevuld, on
           <div style={{margin:"24px auto", maxWidth:380, textAlign:"left",
             background:"var(--bg2)", border:"1px solid var(--line)", borderRadius:12, padding:"14px 16px"}}>
             <div className="mono" style={{fontSize:11, color:"var(--muted)", letterSpacing:"0.2em", fontWeight:700, marginBottom:10, textAlign:"center"}}>JOUW TEAM</div>
-            {gevuld.map((p,i)=>(
+            {gesorteerd.map((p,i)=>(
               <div key={i} style={{display:"flex", alignItems:"center", gap:8, padding:"5px 0",
-                borderBottom: i<gevuld.length-1?"1px solid rgba(38,53,104,0.5)":"none"}}>
+                borderBottom: i<gesorteerd.length-1?"1px solid rgba(38,53,104,0.5)":"none"}}>
                 <span className="mono" style={{fontSize:10, color:"var(--muted)", width:30}}>{p.slotPos || (p.posities&&p.posities[0])}</span>
                 <span style={{flex:1, fontSize:14, color:"var(--white)", fontWeight:500, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis"}}>{p.naam}</span>
                 <Flag team={p.land} size={16}/>
@@ -2763,6 +3033,23 @@ function FinishScreen({ kampioen, uitschakelRonde, teamRating, goals, gevuld, on
             ))}
           </div>
         )}
+
+        {(() => {
+          const ts = topScorer();
+          if (!ts) return null;
+          return (
+            <div style={{margin:"0 auto 20px", maxWidth:380, background:"var(--bg2)", border:"1px solid var(--gold)",
+              borderRadius:12, padding:"12px 18px", display:"flex", alignItems:"center", justifyContent:"center", gap:10}}>
+              <span style={{fontSize:22}}>👑</span>
+              <div>
+                <div className="mono" style={{fontSize:10, color:"var(--muted)", letterSpacing:"0.15em", fontWeight:700}}>TOPSCORER</div>
+                <div className="cond" style={{fontSize:20, fontWeight:800, color:"var(--white)"}}>
+                  {ts.naam} <span style={{color:"var(--gold)"}}>· {ts.goals} {ts.goals===1?"goal":"goals"}</span>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
 
         <div style={{display:"flex", gap:24, justifyContent:"center", margin:"20px 0 32px"}}>
           <StatBlock label="TEAMRATING" value={teamRating.toFixed(1)} color="var(--grass)" big/>
@@ -2800,8 +3087,23 @@ function Confetti() {
 function Scoreboard({ onBack }) {
   const [players, setPlayers] = useState(null);
   const [sortBy, setSortBy] = useState("championships");
+  const [bordHard, setBordHard] = useState(HARD_MODE); // welk scorebord: normaal of hard
+  const [wisBevestig, setWisBevestig] = useState(false);
+  const [wist, setWist] = useState(false);
 
-  useEffect(() => { loadScoreboard().then(setPlayers); }, []);
+  useEffect(() => {
+    setPlayers(null);
+    setWisBevestig(false);
+    loadScoreboard(bordHard).then(setPlayers);
+  }, [bordHard]);
+
+  async function doWis() {
+    setWist(true);
+    await clearScoreboard(bordHard);
+    setPlayers([]);
+    setWisBevestig(false);
+    setWist(false);
+  }
 
   // Kolommen: sleutel, korte label, en waarde-functie per speler.
   const KOLOMMEN = [
@@ -2833,6 +3135,18 @@ function Scoreboard({ onBack }) {
         <button onClick={onBack} className="cond" style={{background:"none", border:"none", color:"var(--muted)", cursor:"pointer", fontSize:15, fontWeight:700}}>← TERUG</button>
       </div>
       <h2 className="cond" style={{fontSize:44, fontWeight:900, color:"var(--white)", marginBottom:8}}>Scorebord</h2>
+      {/* Normaal / Hard scorebord */}
+      <div style={{display:"flex", gap:8, background:"var(--panel)", border:"1.5px solid var(--line)", borderRadius:10, padding:4, marginBottom:14, width:"fit-content"}}>
+        {[[false,"Normaal"],[true,"Hard"]].map(([h,label])=>(
+          <button key={label} onClick={()=>setBordHard(h)} className="cond" style={{
+            padding:"7px 20px", borderRadius:7, fontSize:15, fontWeight:700, cursor:"pointer", border:"none",
+            textTransform:"uppercase", letterSpacing:"0.03em", transition:"all 0.15s",
+            background: bordHard===h ? (h?"var(--red)":"var(--grass)") : "transparent",
+            color: bordHard===h ? (h?"#2B0009":"#03260F") : "var(--muted)"}}>
+            {label}
+          </button>
+        ))}
+      </div>
       <div style={{color:"var(--muted)", fontSize:13, marginBottom:20}}>Tik op een kolom om daarop te sorteren.</div>
 
       {players === null ? (
@@ -2869,6 +3183,14 @@ function Scoreboard({ onBack }) {
               <div className="cond" style={{width:28, fontSize:18, fontWeight:800, color: i===0?"var(--gold)":i<3?"var(--grass)":"var(--muted)"}}>{i+1}</div>
               <div style={{flex:1, minWidth:0}}>
                 <div className="cond" style={{fontSize:19, fontWeight:700, color:"var(--white)", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis"}}>{p.naam}</div>
+                {(() => {
+                  const ts = alltimeTopscorer(p);
+                  return ts ? (
+                    <div className="mono" style={{fontSize:10, color:"var(--muted)", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis"}}>
+                      ⚽ {ts.naam} · {ts.goals}
+                    </div>
+                  ) : null;
+                })()}
               </div>
               <div className="cond" style={{width:66, fontSize:20, fontWeight:800, textAlign:"center",
                 color: sortBy==="games"?"var(--white)":"var(--text)"}}>{p.games}</div>
@@ -2887,6 +3209,34 @@ function Scoreboard({ onBack }) {
           ? "Gedeeld scorebord — resultaten van alle spelers van deze link."
           : "Lokaal scorebord — alleen zichtbaar in deze browser. Stel JSONBin in om te delen."}
       </div>
+      {/* Scorebord wissen */}
+      {players !== null && (
+        <div style={{textAlign:"center", marginTop:16}}>
+          {wisBevestig ? (
+            <div style={{display:"inline-flex", flexDirection:"column", gap:10, alignItems:"center",
+              background:"var(--panel)", border:"1.5px solid var(--red)", borderRadius:12, padding:"16px 20px"}}>
+              <div style={{color:"var(--text)", fontSize:14, maxWidth:320}}>
+                Weet je het zeker? Dit wist het {bordHard?"HARD":"NORMALE"} scorebord voor iedereen en kan niet ongedaan gemaakt worden.
+              </div>
+              <div style={{display:"flex", gap:10}}>
+                <button onClick={doWis} disabled={wist} className="cond" style={{background:"var(--red)", color:"#fff",
+                  border:"none", borderRadius:8, padding:"8px 18px", cursor:"pointer", fontSize:14, fontWeight:800}}>
+                  {wist ? "Wissen..." : "Ja, wis alles"}
+                </button>
+                <button onClick={()=>setWisBevestig(false)} className="cond" style={{background:"transparent",
+                  border:"1px solid var(--line)", color:"var(--muted)", borderRadius:8, padding:"8px 18px", cursor:"pointer", fontSize:14, fontWeight:700}}>
+                  Annuleren
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button onClick={()=>setWisBevestig(true)} className="mono" style={{background:"transparent",
+              border:"none", color:"var(--muted)", cursor:"pointer", fontSize:11, letterSpacing:"0.1em", textDecoration:"underline"}}>
+              Scorebord wissen
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -2897,8 +3247,10 @@ function Scoreboard({ onBack }) {
 function App() {
   const [screen, setScreen] = useState("start"); // start | formation | draft | overview | group | knockout | finish | scoreboard
   const [naam, setNaam] = useState("");
+  const [mode, setMode] = useState("normaal"); // normaal | hard
   // Houd de module-level naam gelijk aan de state, zodat labels de naam tonen i.p.v. "JIJ".
   useEffect(() => { SPELER_NAAM = naam; }, [naam]);
+  useEffect(() => { HARD_MODE = (mode === "hard"); }, [mode]);
   const [loading, setLoading] = useState(false);
   const [formation, setFormation] = useState(null);
   const [gevuld, setGevuld] = useState(null);
@@ -2928,7 +3280,7 @@ function App() {
     setTimeout(() => {
       ensureGroepskanssen();
       setLoading(false);
-      setGoals(0); goalsRef.current = 0;
+      setGoals(0); goalsRef.current = 0; resetToernooiScorers();
       setScreen("formation");
     }, 50);
   }
@@ -2941,7 +3293,7 @@ function App() {
     setTimeout(() => {
       ensureGroepskanssen();
       setLoading(false);
-      setGoals(0); goalsRef.current = 0;
+      setGoals(0); goalsRef.current = 0; resetToernooiScorers();
       setScreen("formation");
     }, 50);
   }
@@ -2992,19 +3344,19 @@ function App() {
   function replay() {
     setFormation(null); setGevuld(null); setOnzeSterkte(null);
     setTeamRating(0); setOnzePos(null); setPoulegenoten(null);
-    setGoals(0); goalsRef.current = 0; setFinishData(null);
+    setGoals(0); goalsRef.current = 0; resetToernooiScorers(); setFinishData(null);
     setScreen("formation");
   }
 
   return (
     <>
-      {screen === "start" && <StartScreen naam={naam} setNaam={setNaam} onStart={startGame} onScoreboard={goScoreboard} loading={loading} naamPrompt={naamPrompt} onBevestigNaam={bevestigNaam} onAnderNaam={anderNaam}/>}
+      {screen === "start" && <StartScreen naam={naam} setNaam={setNaam} onStart={startGame} onScoreboard={goScoreboard} loading={loading} naamPrompt={naamPrompt} onBevestigNaam={bevestigNaam} onAnderNaam={anderNaam} mode={mode} setMode={setMode}/>}
       {screen === "formation" && <FormationScreen onPick={pickFormation}/>}
       {screen === "draft" && <DraftScreen formation={formation} onComplete={draftComplete}/>}
       {screen === "overview" && <SquadOverview gevuld={gevuld} slots={FORMATIES[formation]} formation={formation} onContinue={overviewContinue}/>}
       {screen === "group" && <GroupStage onzeSpelers={gevuld} onzeSterkte={onzeSterkte} onComplete={groupComplete}/>}
       {screen === "knockout" && <Knockout onzeSpelers={gevuld} onzeSterkte={onzeSterkte} onzePos={onzePos} poulegenoten={poulegenoten} onFinish={knockoutFinish} addGoals={addGoals}/>}
-      {screen === "finish" && <FinishScreen kampioen={finishData.kampioen} uitschakelRonde={finishData.uitschakelRonde} teamRating={teamRating} goals={goals} gevuld={gevuld} onScoreboard={goScoreboard} onReplay={replay}/>}
+      {screen === "finish" && <FinishScreen kampioen={finishData.kampioen} uitschakelRonde={finishData.uitschakelRonde} teamRating={teamRating} goals={goals} gevuld={gevuld} formation={formation} onScoreboard={goScoreboard} onReplay={replay}/>}
       {screen === "scoreboard" && <Scoreboard onBack={backFromScoreboard}/>}
     </>
   );
